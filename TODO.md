@@ -1,6 +1,6 @@
-# SubSync Studio: Future Enhancements Roadmap
+# DeltaScribe Studio: Future Enhancements Roadmap
 
-Here is a list of features inspired by prior subtitle syncing utilities (such as `sc0ty/subsync`) that we can build one-by-one to expand SubSync Studio.
+Here is a list of features inspired by prior subtitle syncing utilities (such as `sc0ty/subsync`) that we can build one-by-one to expand DeltaScribe Studio.
 
 ---
 

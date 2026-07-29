@@ -343,7 +343,7 @@ function App() {
           <div className="app-logo">
             <Sparkles size={24} />
           </div>
-          <h1>SubSync Studio</h1>
+          <h1>DeltaScribe Studio</h1>
         </div>
         <div className="header-actions-group">
           {!mediaFile && <KeyboardShortcutsHelp />}
@@ -429,7 +429,7 @@ function App() {
       </main>
 
       <footer className="app-footer">
-        <p>SubSync Studio • Local Only & Secure • Built with React & Vite</p>
+        <p>DeltaScribe Studio • Local Only & Secure • Built with React & Vite</p>
       </footer>
     </>
   );
