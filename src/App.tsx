@@ -5,6 +5,7 @@ import { SubtitleEditor } from './components/SubtitleEditor';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { parseSRT, formatSRT, type SubtitleCue } from './utils/srtParser';
 import { Download, Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
+import { AiAligner } from './components/AiAligner';
 
 function App() {
   // Loaded assets state
@@ -145,6 +146,25 @@ function App() {
     if (selectedCueId === id) {
       setSelectedCueId(reindexed.length > 0 ? reindexed[0].id : null);
     }
+  };
+
+  const handleUpdateMultipleCueTimings = (updates: { id: string; startTime: number; endTime: number }[]) => {
+    const updated = cues.map((cue) => {
+      const match = updates.find((u) => u.id === cue.id);
+      if (match) {
+        return {
+          ...cue,
+          startTime: match.startTime,
+          endTime: match.endTime,
+        };
+      }
+      return cue;
+    });
+
+    setCues(updated.sort((a, b) => a.startTime - b.startTime).map((cue, idx) => ({
+      ...cue,
+      index: idx + 1
+    })));
   };
 
   const handleSplitCue = (id: string) => {
@@ -371,6 +391,13 @@ function App() {
               />
               
               <KeyboardShortcutsHelp variant="inline" />
+              {cues.length > 0 && (
+                <AiAligner
+                  cues={cues}
+                  getCurrentTime={() => playerRef.current?.currentTime || 0}
+                  onUpdateCueTimings={handleUpdateMultipleCueTimings}
+                />
+              )}
               {!subtitleFileName && (
                 <div className="alert alert-info">
                   <AlertCircle size={16} />
