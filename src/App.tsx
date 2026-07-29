@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { FileDropZone } from './components/FileDropZone';
 import { MediaPanel } from './components/MediaPanel';
 import { SubtitleEditor } from './components/SubtitleEditor';
@@ -39,7 +39,7 @@ function App() {
     if (saved) {
       try {
         return JSON.parse(saved);
-      } catch (e) {}
+      } catch {}
     }
     return {
       provider: 'chrome',
@@ -115,192 +115,200 @@ function App() {
   };
 
   // Cue mutation actions
-  const handleAddCue = (insertAfterId?: string) => {
+  const handleAddCue = useCallback((insertAfterId?: string) => {
     const newId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9);
     
-    let newCueStart = currentTime;
-    
-    if (cues.length > 0) {
-      if (insertAfterId) {
-        const afterCue = cues.find(c => c.id === insertAfterId);
-        if (afterCue) {
-          newCueStart = afterCue.endTime + 0.1;
-        }
-      } else {
-        const lastCue = cues[cues.length - 1];
-        newCueStart = lastCue.endTime + 0.1;
-      }
-    }
-
-    const newCue: SubtitleCue = {
-      id: newId,
-      index: 1, // Will be reindexed
-      startTime: newCueStart,
-      endTime: newCueStart + 2.0,
-      text: 'New Subtitle',
-    };
-
-    let updatedCues: SubtitleCue[] = [];
-    if (insertAfterId) {
-      const insertIndex = cues.findIndex(c => c.id === insertAfterId);
-      updatedCues = [
-        ...cues.slice(0, insertIndex + 1),
-        newCue,
-        ...cues.slice(insertIndex + 1)
-      ];
-    } else {
-      updatedCues = [...cues, newCue];
-    }
-
-    // Reindex
-    const reindexed = updatedCues.map((cue, idx) => ({
-      ...cue,
-      index: idx + 1
-    }));
-
-    setCues(reindexed);
-    setSelectedCueId(newId);
-  };
-
-  const handleUpdateCue = (id: string, updatedFields: Partial<SubtitleCue>) => {
-    const updated = cues.map((cue) => {
-      if (cue.id === id) {
-        const result = { ...cue, ...updatedFields };
-        // Validations
-        if (result.startTime < 0) result.startTime = 0;
-        if (result.endTime < result.startTime) {
-          // Keep it logical
-          if (updatedFields.startTime !== undefined) {
-            result.endTime = result.startTime + 1.0;
-          } else {
-            result.startTime = Math.max(0, result.endTime - 1.0);
+    setCues((prevCues) => {
+      let newCueStart = playerRef.current?.currentTime || 0;
+      
+      if (prevCues.length > 0) {
+        if (insertAfterId) {
+          const afterCue = prevCues.find(c => c.id === insertAfterId);
+          if (afterCue) {
+            newCueStart = afterCue.endTime + 0.1;
           }
+        } else {
+          const lastCue = prevCues[prevCues.length - 1];
+          newCueStart = lastCue.endTime + 0.1;
         }
-        return result;
       }
-      return cue;
-    });
-    
-    // Do not sort automatically to keep visual positions stable during timing adjustments
-    const reindexed = updated.map((cue, idx) => ({
-      ...cue,
-      index: idx + 1
-    }));
-    
-    setCues(reindexed);
-  };
 
-  const handleDeleteCue = (id: string) => {
-    const filtered = cues.filter((cue) => cue.id !== id);
-    const reindexed = filtered.map((cue, idx) => ({
-      ...cue,
-      index: idx + 1
-    }));
-    setCues(reindexed);
-    
-    if (selectedCueId === id) {
-      setSelectedCueId(reindexed.length > 0 ? reindexed[0].id : null);
-    }
-  };
+      const newCue: SubtitleCue = {
+        id: newId,
+        index: 1, // Will be reindexed
+        startTime: newCueStart,
+        endTime: newCueStart + 2.0,
+        text: 'New Subtitle',
+      };
 
-  const handleUpdateMultipleCueTimings = (updates: { id: string; startTime: number; endTime: number }[]) => {
-    const updated = cues.map((cue) => {
-      const match = updates.find((u) => u.id === cue.id);
-      if (match) {
-        return {
-          ...cue,
-          startTime: match.startTime,
-          endTime: match.endTime,
-        };
-      }
-      return cue;
-    });
-
-    setCues(updated.sort((a, b) => a.startTime - b.startTime).map((cue, idx) => ({
-      ...cue,
-      index: idx + 1
-    })));
-  };
-
-  const handleSplitCue = (id: string) => {
-    const cueIndex = cues.findIndex((c) => c.id === id);
-    if (cueIndex === -1) return;
-
-    const cue = cues[cueIndex];
-    const durationVal = cue.endTime - cue.startTime;
-    const midTime = cue.startTime + durationVal / 2;
-
-    // Split text: by first newline if available, otherwise by words
-    let text1 = '';
-    let text2 = '';
-    const newlineIndex = cue.text.indexOf('\n');
-
-    if (newlineIndex !== -1) {
-      text1 = cue.text.substring(0, newlineIndex).trim();
-      text2 = cue.text.substring(newlineIndex + 1).trim();
-    } else {
-      const words = cue.text.split(' ');
-      if (words.length > 1) {
-        const midWord = Math.ceil(words.length / 2);
-        text1 = words.slice(0, midWord).join(' ');
-        text2 = words.slice(midWord).join(' ');
+      let updatedCues: SubtitleCue[] = [];
+      if (insertAfterId) {
+        const insertIndex = prevCues.findIndex(c => c.id === insertAfterId);
+        updatedCues = [
+          ...prevCues.slice(0, insertIndex + 1),
+          newCue,
+          ...prevCues.slice(insertIndex + 1)
+        ];
       } else {
-        text1 = cue.text;
-        text2 = '...';
+        updatedCues = [...prevCues, newCue];
       }
-    }
 
-    const secondId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9);
-
-    const firstCue: SubtitleCue = {
-      ...cue,
-      endTime: midTime,
-      text: text1 || '...',
-    };
-
-    const secondCue: SubtitleCue = {
-      id: secondId,
-      index: cue.index + 1,
-      startTime: midTime,
-      endTime: cue.endTime,
-      text: text2 || '...',
-    };
-
-    const updatedCues = [
-      ...cues.slice(0, cueIndex),
-      firstCue,
-      secondCue,
-      ...cues.slice(cueIndex + 1),
-    ];
-
-    const reindexed = updatedCues.map((c, idx) => ({
-      ...c,
-      index: idx + 1,
-    }));
-
-    setCues(reindexed);
-    setSelectedCueId(secondId); // Automatically focus the split chunk
-  };
-
-  const handleShiftTimes = (seconds: number, target: 'all' | 'selected') => {
-    const updated = cues.map((cue) => {
-      if (target === 'all' || (target === 'selected' && cue.id === selectedCueId)) {
-        const start = Math.max(0, cue.startTime + seconds);
-        const end = Math.max(0, cue.endTime + seconds);
-        return {
-          ...cue,
-          startTime: start,
-          endTime: end >= start ? end : start + 1.0
-        };
-      }
-      return cue;
+      return updatedCues.map((cue, idx) => ({
+        ...cue,
+        index: idx + 1
+      }));
     });
 
-    setCues(updated.map((cue, idx) => ({
-      ...cue,
-      index: idx + 1
-    })));
-  };
+    setSelectedCueId(newId);
+  }, []);
+
+  const handleUpdateCue = useCallback((id: string, updatedFields: Partial<SubtitleCue>) => {
+    setCues((prevCues) => {
+      const updated = prevCues.map((cue) => {
+        if (cue.id === id) {
+          const result = { ...cue, ...updatedFields };
+          // Validations
+          if (result.startTime < 0) result.startTime = 0;
+          if (result.endTime < result.startTime) {
+            if (updatedFields.startTime !== undefined) {
+              result.endTime = result.startTime + 1.0;
+            } else {
+              result.startTime = Math.max(0, result.endTime - 1.0);
+            }
+          }
+          return result;
+        }
+        return cue;
+      });
+      
+      return updated.map((cue, idx) => ({
+        ...cue,
+        index: idx + 1
+      }));
+    });
+  }, []);
+
+  const handleDeleteCue = useCallback((id: string) => {
+    setCues((prevCues) => {
+      const filtered = prevCues.filter((cue) => cue.id !== id);
+      const reindexed = filtered.map((cue, idx) => ({
+        ...cue,
+        index: idx + 1
+      }));
+      
+      setSelectedCueId((prevSelected) => {
+        if (prevSelected === id) {
+          return reindexed.length > 0 ? reindexed[0].id : null;
+        }
+        return prevSelected;
+      });
+      
+      return reindexed;
+    });
+  }, []);
+
+  const handleUpdateMultipleCueTimings = useCallback((updates: { id: string; startTime: number; endTime: number }[]) => {
+    setCues((prevCues) => {
+      const updated = prevCues.map((cue) => {
+        const match = updates.find((u) => u.id === cue.id);
+        if (match) {
+          return {
+            ...cue,
+            startTime: match.startTime,
+            endTime: match.endTime,
+          };
+        }
+        return cue;
+      });
+
+      return updated.sort((a, b) => a.startTime - b.startTime).map((cue, idx) => ({
+        ...cue,
+        index: idx + 1
+      }));
+    });
+  }, []);
+
+  const handleSplitCue = useCallback((id: string) => {
+    setCues((prevCues) => {
+      const cueIndex = prevCues.findIndex((c) => c.id === id);
+      if (cueIndex === -1) return prevCues;
+
+      const cue = prevCues[cueIndex];
+      const durationVal = cue.endTime - cue.startTime;
+      const midTime = cue.startTime + durationVal / 2;
+
+      let text1 = '';
+      let text2 = '';
+      const newlineIndex = cue.text.indexOf('\n');
+
+      if (newlineIndex !== -1) {
+        text1 = cue.text.substring(0, newlineIndex).trim();
+        text2 = cue.text.substring(newlineIndex + 1).trim();
+      } else {
+        const words = cue.text.split(' ');
+        if (words.length > 1) {
+          const midWord = Math.ceil(words.length / 2);
+          text1 = words.slice(0, midWord).join(' ');
+          text2 = words.slice(midWord).join(' ');
+        } else {
+          text1 = cue.text;
+          text2 = '...';
+        }
+      }
+
+      const secondId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9);
+
+      const firstCue: SubtitleCue = {
+        ...cue,
+        endTime: midTime,
+        text: text1 || '...',
+      };
+
+      const secondCue: SubtitleCue = {
+        id: secondId,
+        index: cue.index + 1,
+        startTime: midTime,
+        endTime: cue.endTime,
+        text: text2 || '...',
+      };
+
+      const updatedCues = [
+        ...prevCues.slice(0, cueIndex),
+        firstCue,
+        secondCue,
+        ...prevCues.slice(cueIndex + 1),
+      ];
+
+      setSelectedCueId(secondId);
+
+      return updatedCues.map((c, idx) => ({
+        ...c,
+        index: idx + 1,
+      }));
+    });
+  }, []);
+
+  const handleShiftTimes = useCallback((seconds: number, target: 'all' | 'selected') => {
+    setCues((prevCues) => {
+      const updated = prevCues.map((cue) => {
+        if (target === 'all' || (target === 'selected' && cue.id === selectedCueId)) {
+          const start = Math.max(0, cue.startTime + seconds);
+          const end = Math.max(0, cue.endTime + seconds);
+          return {
+            ...cue,
+            startTime: start,
+            endTime: end >= start ? end : start + 1.0
+          };
+        }
+        return cue;
+      });
+
+      return updated.map((cue, idx) => ({
+        ...cue,
+        index: idx + 1
+      }));
+    });
+  }, [selectedCueId]);
 
   const handleSeek = (time: number) => {
     const player = playerRef.current;
@@ -392,7 +400,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isInputFocused, selectedCueId, cues, isPlaying]);
+  }, [isInputFocused, selectedCueId, isPlaying, handleAddCue, handleUpdateCue]);
 
   return (
     <>

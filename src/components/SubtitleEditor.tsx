@@ -79,10 +79,12 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
     (c) => currentTime >= c.startTime && currentTime <= c.endTime
   );
 
+  const activeId = currentActiveCue?.id;
+
   // Auto-scroll to active cue
   useEffect(() => {
-    if (currentActiveCue && listContainerRef.current) {
-      const activeEl = document.getElementById(`cue-card-${currentActiveCue.id}`);
+    if (activeId && listContainerRef.current) {
+      const activeEl = document.getElementById(`cue-card-${activeId}`);
       if (activeEl) {
         activeEl.scrollIntoView({
           behavior: 'smooth',
@@ -90,7 +92,7 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
         });
       }
     }
-  }, [currentActiveCue?.id]);
+  }, [activeId]);
 
   const filteredCues = cues.filter((cue) =>
     cue.text.toLowerCase().includes(searchQuery.toLowerCase())

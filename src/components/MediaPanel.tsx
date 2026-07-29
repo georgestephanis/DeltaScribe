@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Play, Pause, RotateCcw, SkipBack, SkipForward, Volume2, Activity, BarChart3, Waves } from 'lucide-react';
 import type { SubtitleCue } from '../utils/srtParser';
 
@@ -59,7 +59,7 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
     }
   };
 
-  const renderVisualizer = () => {
+  const renderVisualizer = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -181,9 +181,9 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
         ctx.fillRect(width - shiftAmount, y, shiftAmount, binHeight + 0.5);
       }
     }
-  };
+  }, [visualizerMode]);
 
-  const startVisualizerLoop = () => {
+  const startVisualizerLoop = useCallback(() => {
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
     }
@@ -192,14 +192,14 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
       animationFrameRef.current = requestAnimationFrame(draw);
     };
     animationFrameRef.current = requestAnimationFrame(draw);
-  };
+  }, [renderVisualizer]);
 
-  const stopVisualizerLoop = () => {
+  const stopVisualizerLoop = useCallback(() => {
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
     }
-  };
+  }, []);
 
   // Sync animation loop with isPlaying and visualizerMode state changes
   useEffect(() => {
@@ -218,7 +218,7 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
     }
 
     return () => stopVisualizerLoop();
-  }, [isPlaying, visualizerMode]);
+  }, [isPlaying, visualizerMode, renderVisualizer, startVisualizerLoop, stopVisualizerLoop]);
 
   // Handle window resizing for crisp high-DPI display
   useEffect(() => {
@@ -235,7 +235,7 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [visualizerMode]);
+  }, [renderVisualizer]);
 
   // Clean up references and context on unmount
   useEffect(() => {
@@ -248,7 +248,7 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
       analyserRef.current = null;
       sourceRef.current = null;
     };
-  }, []);
+  }, [stopVisualizerLoop]);
 
   // Tear down audio analyser context when media type changes between audio and video elements
   useEffect(() => {
@@ -265,13 +265,13 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
       const ctx = canvas.getContext('2d');
       if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
-  }, [isAudio]);
+  }, [isAudio, stopVisualizerLoop]);
 
   useEffect(() => {
     onTimeUpdate(0);
     onDurationChange(0);
     onPlayStateChange(false);
-  }, [mediaFile.url]);
+  }, [mediaFile.url, onTimeUpdate, onDurationChange, onPlayStateChange]);
 
   const handlePlayPause = async () => {
     const player = playerRef.current;
