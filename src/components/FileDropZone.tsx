@@ -39,7 +39,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
 
       if (file.type.startsWith('video/') || file.type.startsWith('audio/') || ['mp4', 'webm', 'ogg', 'mp3', 'wav', 'm4a'].includes(ext || '')) {
         onMediaLoaded(file);
-      } else if (ext === 'srt') {
+      } else if (ext === 'srt' || ext === 'vtt') {
         const reader = new FileReader();
         reader.onload = (event) => {
           const text = event.target?.result as string;
@@ -95,7 +95,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
         <input
           ref={srtInputRef}
           type="file"
-          accept=".srt"
+          accept=".srt,.vtt"
           className="hidden-input"
           onChange={handleSrtChange}
         />
@@ -106,7 +106,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
           </div>
           <h3>Drag & Drop Files Here</h3>
           <p className="description">
-            Drop your video/audio file AND subtitle (.srt) file, or select them below.
+            Drop your video/audio file AND subtitle (.srt or .vtt) file, or select them below.
           </p>
 
           <div className="import-controls">
@@ -122,7 +122,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
               className="btn btn-secondary"
               type="button"
             >
-              Select SRT File
+              Select SRT/VTT File
             </button>
             {!hasSubtitles && (
               <button
@@ -130,7 +130,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
                 className="btn btn-text"
                 type="button"
               >
-                Create New SRT
+                Create New Subtitles
               </button>
             )}
           </div>
@@ -162,7 +162,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
         <div className="asset-card">
           <div className="card-header">
             <FileText className={`icon ${hasSubtitles ? 'text-sub' : 'text-muted'}`} />
-            <h4>Subtitles (SRT)</h4>
+            <h4>Subtitles (SRT/VTT)</h4>
           </div>
           <div className="card-body">
             {hasSubtitles ? (

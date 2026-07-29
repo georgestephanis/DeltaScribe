@@ -9,20 +9,28 @@ export interface SubtitleCue {
 }
 
 /**
- * Parses timestamp string HH:MM:SS,mmm or HH:MM:SS.mmm to seconds.
+ * Parses timestamp string HH:MM:SS,mmm or HH:MM:SS.mmm (and WebVTT MM:SS.mmm) to seconds.
  */
 export function parseTimestamp(timeStr: string): number {
-  const cleanStr = timeStr.trim().replace('.', ',');
-  const parts = cleanStr.split(':');
-  if (parts.length < 3) return 0;
+  const parts = timeStr.trim().split(':');
+  if (parts.length < 2) return 0;
 
-  const hours = parseInt(parts[0], 10) || 0;
-  const minutes = parseInt(parts[1], 10) || 0;
-  const secondsParts = parts[2].split(',');
-  const seconds = parseInt(secondsParts[0], 10) || 0;
-  const ms = parseInt(secondsParts[1], 10) || 0;
+  let hours = 0;
+  let minutes = 0;
+  let seconds = 0;
 
-  return hours * 3600 + minutes * 60 + seconds + ms / 1000;
+  if (parts.length === 2) {
+    // MM:SS.mmm or MM:SS,mmm
+    minutes = parseInt(parts[0], 10) || 0;
+    seconds = parseFloat(parts[1].replace(',', '.')) || 0;
+  } else if (parts.length >= 3) {
+    // HH:MM:SS.mmm or HH:MM:SS,mmm
+    hours = parseInt(parts[0], 10) || 0;
+    minutes = parseInt(parts[1], 10) || 0;
+    seconds = parseFloat(parts[2].replace(',', '.')) || 0;
+  }
+
+  return hours * 3600 + minutes * 60 + seconds;
 }
 
 /**
@@ -45,56 +53,56 @@ export function formatTimestamp(seconds: number): string {
 }
 
 /**
- * Parses raw SRT string content into an array of SubtitleCues.
+ * Parses raw subtitle content (SRT or VTT) into an array of SubtitleCues.
  */
-export function parseSRT(text: string): SubtitleCue[] {
+export function parseSubtitles(text: string): SubtitleCue[] {
   const cues: SubtitleCue[] = [];
-  // Normalize line breaks
   const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  // Split by double newline (or more)
   const rawBlocks = normalized.split(/\n\s*\n/);
 
   let tempIndex = 1;
 
   for (const block of rawBlocks) {
-    const lines = block.trim().split('\n');
-    if (lines.length < 2) continue;
+    const trimmedBlock = block.trim();
+    if (!trimmedBlock) continue;
 
-    let indexLine = lines[0].trim();
-    let timeLine = lines[1].trim();
-    let textStartIndex = 2;
-
-    // Check if the first line is indeed an index number. If not, maybe index was omitted.
-    if (!/^\d+$/.test(indexLine)) {
-      // It's possible the index was omitted, and line 0 is the timeline
-      if (indexLine.includes('-->')) {
-        timeLine = indexLine;
-        textStartIndex = 1;
-      } else {
-        // Skip block if it does not contain a valid time line
-        continue;
-      }
+    // Skip metadata / header blocks in WebVTT
+    const firstWord = trimmedBlock.split(/\s+/)[0];
+    if (
+      (firstWord === 'WEBVTT' || firstWord === 'NOTE' || firstWord === 'STYLE' || firstWord === 'REGION') &&
+      !trimmedBlock.includes('-->')
+    ) {
+      continue;
     }
 
-    if (!timeLine.includes('-->')) {
-      // Check if maybe line 0 was index, line 1 was not timeline, but line 0 was actually the timeline
-      if (indexLine.includes('-->')) {
-        timeLine = indexLine;
-        textStartIndex = 1;
-      } else {
-        continue;
-      }
-    }
+    const lines = trimmedBlock.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length < 1) continue;
 
+    // Find the timeline line index (contains '-->')
+    const timeLineIndex = lines.findIndex(line => line.includes('-->'));
+    if (timeLineIndex === -1) continue;
+
+    const timeLine = lines[timeLineIndex];
     const timeParts = timeLine.split('-->');
     if (timeParts.length < 2) continue;
 
     const startTime = parseTimestamp(timeParts[0]);
-    const endTime = parseTimestamp(timeParts[1]);
-    const text = lines.slice(textStartIndex).join('\n').trim();
+    
+    // Extract the end time token (ignoring any trailing WebVTT cue settings like align:middle line:90%)
+    const endTimePart = timeParts[1].trim().split(/\s+/)[0];
+    const endTime = parseTimestamp(endTimePart);
 
-    const parsedIndex = parseInt(indexLine, 10);
-    const index = isNaN(parsedIndex) ? tempIndex : parsedIndex;
+    // Text is everything after the timeline line
+    const cueText = lines.slice(timeLineIndex + 1).join('\n');
+
+    // Index is the line before the timeline line (if present and numeric)
+    let index = tempIndex;
+    if (timeLineIndex > 0) {
+      const possibleIndex = parseInt(lines[0], 10);
+      if (!isNaN(possibleIndex)) {
+        index = possibleIndex;
+      }
+    }
 
     cues.push({
       id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
@@ -103,7 +111,7 @@ export function parseSRT(text: string): SubtitleCue[] {
       endTime,
       originalStartTime: startTime,
       originalEndTime: endTime,
-      text
+      text: cueText
     });
 
     tempIndex++;
@@ -111,6 +119,14 @@ export function parseSRT(text: string): SubtitleCue[] {
 
   // Ensure they are sorted by startTime
   return cues.sort((a, b) => a.startTime - b.startTime);
+}
+
+/**
+ * Parses raw SRT string content into an array of SubtitleCues.
+ * Kept for backwards compatibility.
+ */
+export function parseSRT(text: string): SubtitleCue[] {
+  return parseSubtitles(text);
 }
 
 /**
@@ -127,4 +143,23 @@ export function formatSRT(cues: SubtitleCue[]): string {
       return `${index}\n${times}\n${cue.text}`;
     })
     .join('\n\n') + '\n'; // Add trailing newline
+}
+
+/**
+ * Formats a list of SubtitleCues back to standard WebVTT format.
+ */
+export function formatVTT(cues: SubtitleCue[]): string {
+  const sortedCues = [...cues].sort((a, b) => a.startTime - b.startTime);
+
+  const body = sortedCues
+    .map((cue, idx) => {
+      const index = idx + 1;
+      const startTimeStr = formatTimestamp(cue.startTime).replace(',', '.');
+      const endTimeStr = formatTimestamp(cue.endTime).replace(',', '.');
+      const times = `${startTimeStr} --> ${endTimeStr}`;
+      return `${index}\n${times}\n${cue.text}`;
+    })
+    .join('\n\n');
+
+  return `WEBVTT\n\n${body}\n`;
 }

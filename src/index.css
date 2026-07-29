@@ -140,6 +140,34 @@ textarea::-webkit-scrollbar,
   align-items: center;
 }
 
+/* Export format group selector */
+.export-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  padding: 3px;
+  border-radius: 10px;
+}
+
+.select-format {
+  background: transparent;
+  border: none;
+  color: var(--text-main);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 4px 8px;
+  outline: none;
+  cursor: pointer;
+}
+
+.select-format option {
+  background: var(--bg-main);
+  color: var(--text-main);
+}
+
 /* Cards & Panels */
 .card {
   background: var(--bg-card);

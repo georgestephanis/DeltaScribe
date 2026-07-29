@@ -3,7 +3,7 @@ import { FileDropZone } from './components/FileDropZone';
 import { MediaPanel } from './components/MediaPanel';
 import { SubtitleEditor } from './components/SubtitleEditor';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
-import { parseSRT, formatSRT, type SubtitleCue } from './utils/srtParser';
+import { parseSRT, formatSRT, formatVTT, type SubtitleCue } from './utils/srtParser';
 import { Download, Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
 import { AiAligner } from './components/AiAligner';
 
@@ -22,6 +22,7 @@ function App() {
   const [selectedCueId, setSelectedCueId] = useState<string | null>(null);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isTextEditable, setIsTextEditable] = useState(true);
+  const [exportFormat, setExportFormat] = useState<'srt' | 'vtt'>('srt');
 
   const playerRef = useRef<HTMLMediaElement | null>(null);
 
@@ -48,6 +49,14 @@ function App() {
     const parsed = parseSRT(text);
     setCues(parsed);
     setSubtitleFileName(fileName);
+
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    if (ext === 'vtt') {
+      setExportFormat('vtt');
+    } else {
+      setExportFormat('srt');
+    }
+
     if (parsed.length > 0) {
       setSelectedCueId(parsed[0].id);
     }
@@ -56,6 +65,7 @@ function App() {
   const handleCreateNewSubtitles = () => {
     setCues([]);
     setSubtitleFileName('new_subtitles.srt');
+    setExportFormat('srt');
     handleAddCue(); // Insert an initial cue
   };
 
@@ -272,15 +282,16 @@ function App() {
 
   const handleExport = () => {
     if (cues.length === 0) return;
-    const formatted = formatSRT(cues);
+    const formatted = exportFormat === 'vtt' ? formatVTT(cues) : formatSRT(cues);
     const blob = new Blob([formatted], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     
     // Get export name
-    let exportName = 'synced_subtitles.srt';
+    let exportName = `synced_subtitles.${exportFormat}`;
     if (subtitleFileName) {
-      exportName = subtitleFileName.endsWith('.srt') ? subtitleFileName : `${subtitleFileName}.srt`;
+      const baseName = subtitleFileName.replace(/\.(srt|vtt)$/i, '');
+      exportName = `${baseName}.${exportFormat}`;
     }
     
     link.href = url;
@@ -354,10 +365,21 @@ function App() {
             </button>
           )}
           {cues.length > 0 && (
-            <button onClick={handleExport} className="btn btn-primary btn-sm" type="button">
-              <Download size={14} />
-              Export SRT
-            </button>
+            <div className="export-group">
+              <select
+                value={exportFormat}
+                onChange={(e) => setExportFormat(e.target.value as 'srt' | 'vtt')}
+                className="select-format"
+                aria-label="Select export format"
+              >
+                <option value="srt">SRT</option>
+                <option value="vtt">VTT</option>
+              </select>
+              <button onClick={handleExport} className="btn btn-primary btn-sm" type="button">
+                <Download size={14} />
+                Export
+              </button>
+            </div>
           )}
         </div>
       </header>

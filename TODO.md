@@ -40,7 +40,7 @@ Allow loading a correctly-timed secondary subtitle file (often in a different la
 
 ---
 
-## [ ] Feature 3: WebVTT Format Support
+## [x] Feature 3: WebVTT Format Support
 Extend support to parse and write WebVTT (`.vtt`) files natively, which are natively supported by modern HTML5 browsers and media frameworks.
 
 ### Implementation Strategy
