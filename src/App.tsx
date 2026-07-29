@@ -1,0 +1,411 @@
+import { useState, useRef, useEffect } from 'react';
+import { FileDropZone } from './components/FileDropZone';
+import { MediaPanel } from './components/MediaPanel';
+import { SubtitleEditor } from './components/SubtitleEditor';
+import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
+import { parseSRT, formatSRT, type SubtitleCue } from './utils/srtParser';
+import { Download, Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
+
+function App() {
+  // Loaded assets state
+  const [mediaFile, setMediaFile] = useState<{ name: string; type: string; url: string } | null>(null);
+  const [subtitleFileName, setSubtitleFileName] = useState<string | null>(null);
+  const [cues, setCues] = useState<SubtitleCue[]>([]);
+  
+  // Media Playback coordinates
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  
+  // Selection and editor states
+  const [selectedCueId, setSelectedCueId] = useState<string | null>(null);
+  const [isInputFocused, setIsInputFocused] = useState(false);
+  const [isTextEditable, setIsTextEditable] = useState(true);
+
+  const playerRef = useRef<HTMLMediaElement | null>(null);
+
+  // Active subtitle cue based on playback progress
+  const activeCue = cues.find(
+    (cue) => currentTime >= cue.startTime && currentTime <= cue.endTime
+  ) || null;
+
+  // Import handlers
+  const handleMediaLoaded = (file: File) => {
+    // Revoke previous URL if any to avoid memory leaks
+    if (mediaFile?.url) {
+      URL.revokeObjectURL(mediaFile.url);
+    }
+    const url = URL.createObjectURL(file);
+    setMediaFile({
+      name: file.name,
+      type: file.type,
+      url,
+    });
+  };
+
+  const handleSubtitlesLoaded = (text: string, fileName: string) => {
+    const parsed = parseSRT(text);
+    setCues(parsed);
+    setSubtitleFileName(fileName);
+    if (parsed.length > 0) {
+      setSelectedCueId(parsed[0].id);
+    }
+  };
+
+  const handleCreateNewSubtitles = () => {
+    setCues([]);
+    setSubtitleFileName('new_subtitles.srt');
+    handleAddCue(); // Insert an initial cue
+  };
+
+  // Cue mutation actions
+  const handleAddCue = (insertAfterId?: string) => {
+    const newId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9);
+    
+    let newCueStart = currentTime;
+    
+    if (cues.length > 0) {
+      if (insertAfterId) {
+        const afterCue = cues.find(c => c.id === insertAfterId);
+        if (afterCue) {
+          newCueStart = afterCue.endTime + 0.1;
+        }
+      } else {
+        const lastCue = cues[cues.length - 1];
+        newCueStart = lastCue.endTime + 0.1;
+      }
+    }
+
+    const newCue: SubtitleCue = {
+      id: newId,
+      index: 1, // Will be reindexed
+      startTime: newCueStart,
+      endTime: newCueStart + 2.0,
+      text: 'New Subtitle',
+    };
+
+    let updatedCues: SubtitleCue[] = [];
+    if (insertAfterId) {
+      const insertIndex = cues.findIndex(c => c.id === insertAfterId);
+      updatedCues = [
+        ...cues.slice(0, insertIndex + 1),
+        newCue,
+        ...cues.slice(insertIndex + 1)
+      ];
+    } else {
+      updatedCues = [...cues, newCue];
+    }
+
+    // Reindex
+    const reindexed = updatedCues.map((cue, idx) => ({
+      ...cue,
+      index: idx + 1
+    }));
+
+    setCues(reindexed);
+    setSelectedCueId(newId);
+  };
+
+  const handleUpdateCue = (id: string, updatedFields: Partial<SubtitleCue>) => {
+    const updated = cues.map((cue) => {
+      if (cue.id === id) {
+        const result = { ...cue, ...updatedFields };
+        // Validations
+        if (result.startTime < 0) result.startTime = 0;
+        if (result.endTime < result.startTime) {
+          // Keep it logical
+          if (updatedFields.startTime !== undefined) {
+            result.endTime = result.startTime + 1.0;
+          } else {
+            result.startTime = Math.max(0, result.endTime - 1.0);
+          }
+        }
+        return result;
+      }
+      return cue;
+    });
+    
+    // Do not sort automatically to keep visual positions stable during timing adjustments
+    const reindexed = updated.map((cue, idx) => ({
+      ...cue,
+      index: idx + 1
+    }));
+    
+    setCues(reindexed);
+  };
+
+  const handleDeleteCue = (id: string) => {
+    const filtered = cues.filter((cue) => cue.id !== id);
+    const reindexed = filtered.map((cue, idx) => ({
+      ...cue,
+      index: idx + 1
+    }));
+    setCues(reindexed);
+    
+    if (selectedCueId === id) {
+      setSelectedCueId(reindexed.length > 0 ? reindexed[0].id : null);
+    }
+  };
+
+  const handleSplitCue = (id: string) => {
+    const cueIndex = cues.findIndex((c) => c.id === id);
+    if (cueIndex === -1) return;
+
+    const cue = cues[cueIndex];
+    const durationVal = cue.endTime - cue.startTime;
+    const midTime = cue.startTime + durationVal / 2;
+
+    // Split text: by first newline if available, otherwise by words
+    let text1 = '';
+    let text2 = '';
+    const newlineIndex = cue.text.indexOf('\n');
+
+    if (newlineIndex !== -1) {
+      text1 = cue.text.substring(0, newlineIndex).trim();
+      text2 = cue.text.substring(newlineIndex + 1).trim();
+    } else {
+      const words = cue.text.split(' ');
+      if (words.length > 1) {
+        const midWord = Math.ceil(words.length / 2);
+        text1 = words.slice(0, midWord).join(' ');
+        text2 = words.slice(midWord).join(' ');
+      } else {
+        text1 = cue.text;
+        text2 = '...';
+      }
+    }
+
+    const secondId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9);
+
+    const firstCue: SubtitleCue = {
+      ...cue,
+      endTime: midTime,
+      text: text1 || '...',
+    };
+
+    const secondCue: SubtitleCue = {
+      id: secondId,
+      index: cue.index + 1,
+      startTime: midTime,
+      endTime: cue.endTime,
+      text: text2 || '...',
+    };
+
+    const updatedCues = [
+      ...cues.slice(0, cueIndex),
+      firstCue,
+      secondCue,
+      ...cues.slice(cueIndex + 1),
+    ];
+
+    const reindexed = updatedCues.map((c, idx) => ({
+      ...c,
+      index: idx + 1,
+    }));
+
+    setCues(reindexed);
+    setSelectedCueId(secondId); // Automatically focus the split chunk
+  };
+
+  const handleShiftTimes = (seconds: number, target: 'all' | 'selected') => {
+    const updated = cues.map((cue) => {
+      if (target === 'all' || (target === 'selected' && cue.id === selectedCueId)) {
+        const start = Math.max(0, cue.startTime + seconds);
+        const end = Math.max(0, cue.endTime + seconds);
+        return {
+          ...cue,
+          startTime: start,
+          endTime: end >= start ? end : start + 1.0
+        };
+      }
+      return cue;
+    });
+
+    setCues(updated.map((cue, idx) => ({
+      ...cue,
+      index: idx + 1
+    })));
+  };
+
+  const handleSeek = (time: number) => {
+    const player = playerRef.current;
+    if (player) {
+      player.currentTime = time;
+      setCurrentTime(time);
+    }
+  };
+
+  const handleReset = () => {
+    if (window.confirm("Are you sure you want to unload current files? Unsaved sync progress will be lost.")) {
+      if (mediaFile?.url) {
+        URL.revokeObjectURL(mediaFile.url);
+      }
+      setMediaFile(null);
+      setSubtitleFileName(null);
+      setCues([]);
+      setSelectedCueId(null);
+      setCurrentTime(0);
+      setDuration(0);
+      setIsPlaying(false);
+    }
+  };
+
+  const handleExport = () => {
+    if (cues.length === 0) return;
+    const formatted = formatSRT(cues);
+    const blob = new Blob([formatted], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    
+    // Get export name
+    let exportName = 'synced_subtitles.srt';
+    if (subtitleFileName) {
+      exportName = subtitleFileName.endsWith('.srt') ? subtitleFileName : `${subtitleFileName}.srt`;
+    }
+    
+    link.href = url;
+    link.download = exportName;
+    document.body.appendChild(link);
+    link.click();
+    
+    // Cleanup
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Keyboard Event Listeners for Syncing
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isInputFocused) return; // Skip if user is editing subtitle text or numbers
+
+      const player = playerRef.current;
+      if (!player) return;
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (isPlaying) {
+          player.pause();
+        } else {
+          player.play().catch(err => console.log(err));
+        }
+      } else if (e.code === 'BracketLeft') {
+        e.preventDefault();
+        if (selectedCueId) {
+          handleUpdateCue(selectedCueId, { startTime: player.currentTime });
+        }
+      } else if (e.code === 'BracketRight') {
+        e.preventDefault();
+        if (selectedCueId) {
+          handleUpdateCue(selectedCueId, { endTime: player.currentTime });
+        }
+      } else if (e.code === 'KeyN') {
+        e.preventDefault();
+        handleAddCue();
+      } else if (e.code === 'ArrowLeft') {
+        e.preventDefault();
+        const amount = e.shiftKey ? -0.5 : -5;
+        player.currentTime = Math.max(0, player.currentTime + amount);
+      } else if (e.code === 'ArrowRight') {
+        e.preventDefault();
+        const amount = e.shiftKey ? 0.5 : 5;
+        player.currentTime = Math.min(player.duration || 0, player.currentTime + amount);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isInputFocused, selectedCueId, cues, isPlaying]);
+
+  return (
+    <>
+      <header className="app-header">
+        <div className="brand-section">
+          <div className="app-logo">
+            <Sparkles size={24} />
+          </div>
+          <h1>SubSync Studio</h1>
+        </div>
+        <div className="header-actions-group">
+          {!mediaFile && <KeyboardShortcutsHelp />}
+          {mediaFile && (
+            <button onClick={handleReset} className="btn btn-secondary btn-sm" type="button">
+              <RefreshCw size={14} />
+              Reset Workspace
+            </button>
+          )}
+          {cues.length > 0 && (
+            <button onClick={handleExport} className="btn btn-primary btn-sm" type="button">
+              <Download size={14} />
+              Export SRT
+            </button>
+          )}
+        </div>
+      </header>
+
+      <main className="dashboard-grid">
+        {!mediaFile ? (
+          <div style={{ gridColumn: '1 / -1' }}>
+            <FileDropZone
+              mediaFile={mediaFile}
+              hasSubtitles={cues.length > 0}
+              subtitleFileName={subtitleFileName}
+              onMediaLoaded={handleMediaLoaded}
+              onSubtitlesLoaded={handleSubtitlesLoaded}
+              onCreateNewSubtitles={handleCreateNewSubtitles}
+            />
+          </div>
+        ) : (
+          <>
+            {/* Left Column: Player & Dropzone details */}
+            <div className="workspace-importer">
+              <MediaPanel
+                mediaFile={mediaFile}
+                currentTime={currentTime}
+                duration={duration}
+                isPlaying={isPlaying}
+                activeCue={activeCue}
+                playerRef={playerRef}
+                onTimeUpdate={setCurrentTime}
+                onDurationChange={setDuration}
+                onPlayStateChange={setIsPlaying}
+              />
+              
+              <KeyboardShortcutsHelp variant="inline" />
+              {!subtitleFileName && (
+                <div className="alert alert-info">
+                  <AlertCircle size={16} />
+                  <span>You've loaded the media! Select an SRT file or click <strong>Create New SRT</strong> in the header/sidebar to start timing.</span>
+                </div>
+              )}
+            </div>
+
+            {/* Right Column: Cue timing list */}
+            <div>
+              <SubtitleEditor
+                cues={cues}
+                selectedCueId={selectedCueId}
+                currentTime={currentTime}
+                isTextEditable={isTextEditable}
+                onToggleTextEditable={() => setIsTextEditable(!isTextEditable)}
+                onSelectCue={setSelectedCueId}
+                onChangeCue={handleUpdateCue}
+                onDeleteCue={handleDeleteCue}
+                onAddCue={handleAddCue}
+                onSplitCue={handleSplitCue}
+                onShiftTimes={handleShiftTimes}
+                onSeek={handleSeek}
+                onFocusInput={setIsInputFocused}
+              />
+            </div>
+          </>
+        )}
+      </main>
+
+      <footer className="app-footer">
+        <p>SubSync Studio • Local Only & Secure • Built with React & Vite</p>
+      </footer>
+    </>
+  );
+}
+
+export default App;
