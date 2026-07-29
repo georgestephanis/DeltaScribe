@@ -52,20 +52,16 @@ Extend support to parse and write WebVTT (`.vtt`) files natively, which are nati
 
 ---
 
-## [ ] Feature 4: Audio Waveform Canvas Display
-Render a visual waveform scrubber of the audio track beneath the media player so the sync designer can visually align cue boundaries with words/syllables.
+## [x] Feature 4: Audio Waveform & Spectroscopic Canvas Display
+Render real-time visual waveforms, frequency spectrum bars, and a spectroscopic waterfall analyzer inside the media player card.
 
 ### Implementation Strategy
-1. **Audio Context decoding**:
-   - When a media file is loaded, load it as an array buffer:
-     ```typescript
-     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-     const response = await fetch(mediaFileUrl);
-     const arrayBuffer = await response.arrayBuffer();
-     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-     ```
-2. **Waveform canvas renderer**: Read channel data and draw the peak coordinates onto a `<canvas>` element that mirrors the width and scrub status of the scrubber bar.
-3. **Drag-to-Adjust boundaries**: Allow visually adjusting the active cue start/end bounds by clicking and dragging anchors on the waveform itself.
+1. **Web Audio connection**: Connect the HTML `<audio>` elements via a lazy-initialized `MediaElementAudioSourceNode` and `AnalyserNode` connected to the `AudioContext`.
+2. **Canvas Renderers**: Update drawing loops matching display pixel ratios:
+   - **Waveform View**: Oscillosopic time-domain glowing line.
+   - **Spectrum Bars**: Frequency-domain bar chart with linear gradients.
+   - **Spectrogram View**: Horizontally-scrolling frequency waterfall (spectrograph) showing heatmap values over time.
+3. **Interactivity Toggle**: Add an overlay segment switcher rotating between the three visualization views.
 
 ---
 
