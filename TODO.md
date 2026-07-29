@@ -69,10 +69,10 @@ Render a visual waveform scrubber of the audio track beneath the media player so
 
 ---
 
-## [ ] Feature 5: Leverage Chrome's Built-in AI & Web APIs
+## [/] Feature 5: Leverage Chrome's Built-in AI & Web APIs
 Integrate Chrome's built-in AI models (Gemini Nano) and Web Speech APIs to perform speech-to-text timing generation, local translation, and timing quality assurance completely client-side.
 
-### A. Local Language Translation (Chrome Translation API)
+### [ ] A. Local Language Translation (Chrome Translation API)
 *   **Concept**: Translate subtitles locally using the browser's built-in translation model (`translation.createTranslator()`).
 *   **Implementation**:
     1. Check for native translator availability: `await window.translation?.canTranslate({ sourceLanguage: 'en', targetLanguage: 'es' })`.
@@ -82,15 +82,20 @@ Integrate Chrome's built-in AI models (Gemini Nano) and Web Speech APIs to perfo
        const translatedText = await translator.translate(cue.text);
        ```
 
-### B. Subtitle Quality Check & Semantic Alignment (Chrome Prompt API / Gemini Nano)
+### [ ] B. Subtitle Quality Check & Context Analysis (Chrome Prompt API / Gemini Nano)
 *   **Concept**: Analyze subtitle text using Chrome's built-in Gemini Nano model (`ai.languageModel`) to run semantic checks (e.g. check for alignment errors, line splitting recommendations, grammatical formatting, or context checks).
 *   **Implementation**:
     1. Initialize the session: `const session = await window.ai.languageModel.create()`.
     2. Prompt the local model to analyze subtitle line breaks or check translation semantic alignment between reference and target subtitle text.
 
-### C. Voice-to-Text Speech Recognition (Web Speech API)
+### [x] C. Voice-to-Text Speech Recognition (Web Speech API)
 *   **Concept**: Recognize speech from the media playback to auto-generate timing blocks or highlight spoken segments.
 *   **Implementation**:
     1. Use the browser's native `SpeechRecognition` API (`webkitSpeechRecognition`).
-    2. Stream the media playback audio into the recognition engine.
-    3. Capture real-time text and timestamps to bootstrap a blank subtitle timeline or check manual timing precision automatically.
+    2. Capture real-time text and timestamps to bootstrap a blank subtitle timeline or check manual timing precision automatically.
+
+### [x] D. Chrome Gemini Nano AI Alignment
+*   **Concept**: Align original subtitle text with the recognized speech transcripts based on semantic meaning using Chrome's local AI model (`window.ai.languageModel`).
+*   **Implementation**:
+    1. Create a prompt containing the original subtitles and the transcriptions with recorded timestamps.
+    2. Prompt the local model to map subtitle IDs to start/end times and update timings client-side.
