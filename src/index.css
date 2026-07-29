@@ -522,9 +522,17 @@ textarea::-webkit-scrollbar,
   display: flex;
   flex-direction: column;
   height: 100%;
+  max-height: calc(100vh - 220px);
   min-height: 0;
   padding: 0;
   overflow: hidden;
+}
+
+@media (max-width: 1024px) {
+  .subtitle-editor-panel {
+    max-height: 500px;
+    min-height: 300px;
+  }
 }
 
 .panel-header {
