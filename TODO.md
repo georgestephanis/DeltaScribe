@@ -30,7 +30,7 @@ Adjust all subtitle timing coordinates by a constant factor to fix progressive "
 
 ---
 
-## [ ] Feature 2: Reference Subtitle Track (Subtitle-to-Subtitle Sync)
+## [x] Feature 2: Reference Subtitle Track (Subtitle-to-Subtitle Sync)
 Allow loading a correctly-timed secondary subtitle file (often in a different language) as a visual reference, letting the sync designer easily copy timings.
 
 ### Implementation Strategy
@@ -68,15 +68,12 @@ Render real-time visual waveforms, frequency spectrum bars, and a spectroscopic 
 ## [/] Feature 5: Leverage Chrome's Built-in AI & Web APIs
 Integrate Chrome's built-in AI models (Gemini Nano) and Web Speech APIs to perform speech-to-text timing generation, local translation, and timing quality assurance completely client-side.
 
-### [ ] A. Local Language Translation (Chrome Translation API)
-*   **Concept**: Translate subtitles locally using the browser's built-in translation model (`translation.createTranslator()`).
+### [x] A. Local Language Translation (Chrome Prompt API / Gemini Nano)
+*   **Concept**: Translate subtitles locally using the browser's built-in Gemini Nano model (`ai.languageModel`).
 *   **Implementation**:
-    1. Check for native translator availability: `await window.translation?.canTranslate({ sourceLanguage: 'en', targetLanguage: 'es' })`.
-    2. Instantiate: `const translator = await window.translation.createTranslator({ sourceLanguage: 'en', targetLanguage: 'es' })`.
-    3. Translate the cue list text while retaining timestamps:
-       ```typescript
-       const translatedText = await translator.translate(cue.text);
-       ```
+    1. Backup active subtitle cues to the reference track.
+    2. Instantiate a local model session: `const session = await window.ai.languageModel.create()`.
+    3. Loop through active cues, translating their text in-place while retaining all start/end timings and anchor values.
 
 ### [ ] B. Subtitle Quality Check & Context Analysis (Chrome Prompt API / Gemini Nano)
 *   **Concept**: Analyze subtitle text using Chrome's built-in Gemini Nano model (`ai.languageModel`) to run semantic checks (e.g. check for alignment errors, line splitting recommendations, grammatical formatting, or context checks).

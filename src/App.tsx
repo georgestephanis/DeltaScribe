@@ -24,6 +24,10 @@ function App() {
   const [isTextEditable, setIsTextEditable] = useState(true);
   const [exportFormat, setExportFormat] = useState<'srt' | 'vtt'>('srt');
 
+  // Reference subtitle track states
+  const [referenceCues, setReferenceCues] = useState<SubtitleCue[]>([]);
+  const [referenceFileName, setReferenceFileName] = useState<string | null>(null);
+
   const playerRef = useRef<HTMLMediaElement | null>(null);
 
   // Active subtitle cue based on playback progress
@@ -60,6 +64,21 @@ function App() {
     if (parsed.length > 0) {
       setSelectedCueId(parsed[0].id);
     }
+  };
+
+  const handleReferenceSubtitlesLoaded = (text: string, fileName: string) => {
+    const parsed = parseSRT(text);
+    setReferenceCues(parsed);
+    setReferenceFileName(fileName);
+  };
+
+  const handleClearReference = () => {
+    setReferenceCues([]);
+    setReferenceFileName(null);
+  };
+
+  const handleCopyReferenceTiming = (cueId: string, startTime: number, endTime: number) => {
+    handleUpdateCue(cueId, { startTime, endTime });
   };
 
   const handleCreateNewSubtitles = () => {
@@ -277,6 +296,8 @@ function App() {
       setCurrentTime(0);
       setDuration(0);
       setIsPlaying(false);
+      setReferenceCues([]);
+      setReferenceFileName(null);
     }
   };
 
@@ -391,8 +412,12 @@ function App() {
               mediaFile={mediaFile}
               hasSubtitles={cues.length > 0}
               subtitleFileName={subtitleFileName}
+              referenceFileName={referenceFileName}
+              hasReferenceSubtitles={referenceCues.length > 0}
               onMediaLoaded={handleMediaLoaded}
               onSubtitlesLoaded={handleSubtitlesLoaded}
+              onReferenceSubtitlesLoaded={handleReferenceSubtitlesLoaded}
+              onClearReference={handleClearReference}
               onCreateNewSubtitles={handleCreateNewSubtitles}
             />
           </div>
@@ -418,6 +443,18 @@ function App() {
                   cues={cues}
                   getCurrentTime={() => playerRef.current?.currentTime || 0}
                   onUpdateCueTimings={handleUpdateMultipleCueTimings}
+                  onSaveCurrentAsReference={() => {
+                    setReferenceCues([...cues]);
+                    setReferenceFileName(subtitleFileName ? `original_${subtitleFileName}` : 'original_subtitles.srt');
+                  }}
+                  onUpdateAllCues={(updatedCues) => {
+                    setCues(updatedCues);
+                    if (subtitleFileName) {
+                      const ext = subtitleFileName.split('.').pop()?.toLowerCase();
+                      const base = subtitleFileName.replace(/\.(srt|vtt)$/i, '');
+                      setSubtitleFileName(`${base}_translated.${ext}`);
+                    }
+                  }}
                 />
               )}
               {!subtitleFileName && (
@@ -432,6 +469,7 @@ function App() {
             <div>
               <SubtitleEditor
                 cues={cues}
+                referenceCues={referenceCues}
                 selectedCueId={selectedCueId}
                 currentTime={currentTime}
                 isTextEditable={isTextEditable}
@@ -444,6 +482,7 @@ function App() {
                 onShiftTimes={handleShiftTimes}
                 onSeek={handleSeek}
                 onFocusInput={setIsInputFocused}
+                onCopyReferenceTiming={handleCopyReferenceTiming}
               />
             </div>
           </>

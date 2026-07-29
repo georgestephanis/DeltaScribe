@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Plus, Trash2, Search, FastForward, SlidersHorizontal, Lock, Unlock, Scissors, RotateCcw } from 'lucide-react';
+import { Plus, Trash2, Search, FastForward, SlidersHorizontal, Lock, Unlock, Scissors, RotateCcw, Copy } from 'lucide-react';
 import type { SubtitleCue } from '../utils/srtParser';
 
 interface SubtitleEditorProps {
   cues: SubtitleCue[];
+  referenceCues: SubtitleCue[];
   selectedCueId: string | null;
   currentTime: number;
   isTextEditable: boolean;
@@ -16,6 +17,7 @@ interface SubtitleEditorProps {
   onShiftTimes: (seconds: number, target: 'all' | 'selected') => void;
   onSeek: (time: number) => void;
   onFocusInput: (isFocused: boolean) => void;
+  onCopyReferenceTiming: (cueId: string, startTime: number, endTime: number) => void;
 }
 
 interface AutoExpandingTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -49,6 +51,7 @@ const AutoExpandingTextarea: React.FC<AutoExpandingTextareaProps> = ({ value, ..
 
 export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
   cues,
+  referenceCues,
   selectedCueId,
   currentTime,
   isTextEditable,
@@ -61,6 +64,7 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
   onShiftTimes,
   onSeek,
   onFocusInput,
+  onCopyReferenceTiming,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [shiftAmount, setShiftAmount] = useState('1.0');
@@ -455,6 +459,32 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
                     }}
                     onBlur={() => onFocusInput(false)}
                   />
+                  {(() => {
+                    const refCue = referenceCues.find(rc => rc.index === cue.index);
+                    if (refCue) {
+                      return (
+                        <div className="reference-cue-box">
+                          <div className="reference-header">
+                            <span className="reference-label">Reference #{refCue.index}</span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onCopyReferenceTiming(cue.id, refCue.startTime, refCue.endTime);
+                              }}
+                              className="btn-copy-timing"
+                              title="Copy reference timings to this cue"
+                              type="button"
+                            >
+                              <Copy size={11} />
+                              Sync Timing
+                            </button>
+                          </div>
+                          <p className="reference-text">{refCue.text}</p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               </div>
             );

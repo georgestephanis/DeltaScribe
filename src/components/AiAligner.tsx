@@ -6,12 +6,16 @@ interface AiAlignerProps {
   cues: SubtitleCue[];
   getCurrentTime: () => number;
   onUpdateCueTimings: (updates: { id: string; startTime: number; endTime: number }[]) => void;
+  onSaveCurrentAsReference: () => void;
+  onUpdateAllCues: (updatedCues: SubtitleCue[]) => void;
 }
 
 export const AiAligner: React.FC<AiAlignerProps> = ({
   cues,
   getCurrentTime,
   onUpdateCueTimings,
+  onSaveCurrentAsReference,
+  onUpdateAllCues,
 }) => {
   const [isListening, setIsListening] = useState(false);
   const [capturedTranscripts, setCapturedTranscripts] = useState<{ time: number; text: string }[]>([]);
@@ -21,6 +25,25 @@ export const AiAligner: React.FC<AiAlignerProps> = ({
   const [isSuccess, setIsSuccess] = useState(false);
 
   const recognitionRef = useRef<any>(null);
+
+  // Translation states
+  const [targetLang, setTargetLang] = useState('Spanish');
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translateProgress, setTranslateProgress] = useState(0);
+
+  const SUPPORTED_LANGUAGES = [
+    'Spanish',
+    'French',
+    'German',
+    'Italian',
+    'Portuguese',
+    'Japanese',
+    'Chinese (Simplified)',
+    'Korean',
+    'Russian',
+    'Arabic',
+    'Turkish'
+  ];
 
   // Check Chrome AI capabilities on mount
   useEffect(() => {
@@ -220,6 +243,73 @@ ${JSON.stringify(speechTranscripts)}
     }
   };
 
+  const translateSubtitles = async () => {
+    setIsTranslating(true);
+    setTranslateProgress(0);
+    setAlignError(null);
+    setIsSuccess(false);
+
+    try {
+      if (cues.length === 0) {
+        throw new Error("No subtitle cues loaded.");
+      }
+
+      const win = window as any;
+      if (!win.ai || !win.ai.languageModel) {
+        throw new Error("Chrome built-in AI (window.ai.languageModel) is not available.");
+      }
+
+      // Save original cues to reference track first
+      onSaveCurrentAsReference();
+
+      // Initialize Gemini Session
+      const session = await win.ai.languageModel.create({
+        systemPrompt: "You are a precise, professional subtitle translator. You translate the input text to the target language exactly. Do not output any annotations, index markers, explanations, or metadata. Output ONLY the raw translation."
+      });
+
+      const translatedCues = [...cues];
+
+      for (let i = 0; i < cues.length; i++) {
+        const cue = cues[i];
+        
+        if (!cue.text.trim()) {
+          setTranslateProgress(Math.round(((i + 1) / cues.length) * 100));
+          continue;
+        }
+
+        const prompt = `Translate the following subtitle text to ${targetLang}. Preserve line breaks if any, but output ONLY the translated text. Do not add explanations.
+
+Text to translate:
+${cue.text}`;
+
+        const translationResponse = await session.prompt(prompt);
+        
+        let cleanText = translationResponse.trim();
+        if (cleanText.startsWith('"') && cleanText.endsWith('"')) {
+          cleanText = cleanText.substring(1, cleanText.length - 1);
+        }
+        
+        translatedCues[i] = {
+          ...cue,
+          text: cleanText
+        };
+
+        setTranslateProgress(Math.round(((i + 1) / cues.length) * 100));
+      }
+
+      session.destroy();
+
+      onUpdateAllCues(translatedCues);
+      setIsSuccess(true);
+
+    } catch (err: any) {
+      console.error("AI translation error:", err);
+      setAlignError(err.message || "Failed to translate subtitles with Chrome AI.");
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
   const formatTime = (secs: number) => {
     const minutes = Math.floor(secs / 60);
     const seconds = Math.floor(secs % 60);
@@ -318,10 +408,67 @@ ${JSON.stringify(speechTranscripts)}
             </div>
           )}
 
-          {isSuccess && (
-            <div className="align-success-message">
+          {isSuccess && !isTranslating && (
+            <div className="align-success-message animate-fade-in">
               <Check size={16} className="success-icon" />
-              <span>Timings updated successfully! Review your cues panel.</span>
+              <span>Operation completed successfully! Review cues panel.</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Local Translation panel */}
+      {cues.length > 0 && (
+        <div className="translation-actions-panel animate-fade-in">
+          <div className="divider-line" />
+          
+          <div className="card-header-inline sub-header">
+            <Brain className="icon text-primary animate-pulse" size={16} />
+            <h4>AI Subtitle Translator</h4>
+          </div>
+
+          <p className="ai-description small">
+            Translate the active subtitle track locally. The original subtitles will be saved to the reference track for proofreading.
+          </p>
+
+          {aiAvailable === 'yes' ? (
+            <div className="translation-controls">
+              <div className="translation-input-row">
+                <select
+                  value={targetLang}
+                  onChange={(e) => setTargetLang(e.target.value)}
+                  className="select-lang"
+                  disabled={isTranslating}
+                  aria-label="Target language select"
+                >
+                  {SUPPORTED_LANGUAGES.map((lang) => (
+                    <option key={lang} value={lang}>{lang}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={translateSubtitles}
+                  disabled={isTranslating}
+                  className="btn btn-primary btn-sm btn-icon"
+                  type="button"
+                >
+                  <Sparkles size={14} />
+                  {isTranslating ? "Translating..." : "Translate Cues"}
+                </button>
+              </div>
+
+              {isTranslating && (
+                <div className="progress-container animate-slide-down">
+                  <div className="progress-bar-bg">
+                    <div className="progress-bar-fill" style={{ width: `${translateProgress}%` }} />
+                  </div>
+                  <span className="progress-text">Progress: {translateProgress}%</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="ai-warning-box">
+              <AlertTriangle size={14} className="warning-icon" />
+              <span>Chrome built-in AI (window.ai.languageModel) is unavailable. Enable local models in Chrome flags.</span>
             </div>
           )}
         </div>

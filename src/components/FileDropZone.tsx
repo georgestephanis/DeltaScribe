@@ -5,8 +5,12 @@ interface FileDropZoneProps {
   mediaFile: { name: string; type: string; url: string } | null;
   hasSubtitles: boolean;
   subtitleFileName: string | null;
+  referenceFileName: string | null;
+  hasReferenceSubtitles: boolean;
   onMediaLoaded: (file: File) => void;
   onSubtitlesLoaded: (text: string, fileName: string) => void;
+  onReferenceSubtitlesLoaded: (text: string, fileName: string) => void;
+  onClearReference: () => void;
   onCreateNewSubtitles: () => void;
 }
 
@@ -14,13 +18,18 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
   mediaFile,
   hasSubtitles,
   subtitleFileName,
+  referenceFileName,
+  hasReferenceSubtitles,
   onMediaLoaded,
   onSubtitlesLoaded,
+  onReferenceSubtitlesLoaded,
+  onClearReference,
   onCreateNewSubtitles,
 }) => {
   const [isDragActive, setIsDragActive] = useState(false);
   const mediaInputRef = useRef<HTMLInputElement>(null);
   const srtInputRef = useRef<HTMLInputElement>(null);
+  const refSubInputRef = useRef<HTMLInputElement>(null);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -44,7 +53,11 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
         reader.onload = (event) => {
           const text = event.target?.result as string;
           if (text) {
-            onSubtitlesLoaded(text, file.name);
+            if (hasSubtitles) {
+              onReferenceSubtitlesLoaded(text, file.name);
+            } else {
+              onSubtitlesLoaded(text, file.name);
+            }
           }
         };
         reader.readAsText(file);
@@ -74,6 +87,20 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
     }
   };
 
+  const handleRefSubChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const text = event.target?.result as string;
+        if (text) {
+          onReferenceSubtitlesLoaded(text, file.name);
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
   const isAudio = mediaFile?.type.startsWith('audio/');
 
   return (
@@ -99,6 +126,13 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
           className="hidden-input"
           onChange={handleSrtChange}
         />
+        <input
+          ref={refSubInputRef}
+          type="file"
+          accept=".srt,.vtt"
+          className="hidden-input"
+          onChange={handleRefSubChange}
+        />
 
         <div className="dropzone-content">
           <div className="icon-group">
@@ -122,8 +156,17 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
               className="btn btn-secondary"
               type="button"
             >
-              Select SRT/VTT File
+              {hasSubtitles ? "Select Active SRT/VTT" : "Select SRT/VTT File"}
             </button>
+            {hasSubtitles && (
+              <button
+                onClick={() => refSubInputRef.current?.click()}
+                className="btn btn-secondary"
+                type="button"
+              >
+                Select Reference SRT/VTT
+              </button>
+            )}
             {!hasSubtitles && (
               <button
                 onClick={onCreateNewSubtitles}
@@ -162,7 +205,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
         <div className="asset-card">
           <div className="card-header">
             <FileText className={`icon ${hasSubtitles ? 'text-sub' : 'text-muted'}`} />
-            <h4>Subtitles (SRT/VTT)</h4>
+            <h4>Active Subtitles (SRT/VTT)</h4>
           </div>
           <div className="card-body">
             {hasSubtitles ? (
@@ -174,6 +217,36 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
               </div>
             ) : (
               <span className="placeholder">No subtitle file loaded</span>
+            )}
+          </div>
+        </div>
+
+        <div className="asset-card">
+          <div className="card-header">
+            <FileText className={`icon ${hasReferenceSubtitles ? 'text-audio' : 'text-muted'}`} />
+            <h4>Reference Subtitles (SRT/VTT)</h4>
+          </div>
+          <div className="card-body">
+            {hasReferenceSubtitles ? (
+              <div className="loaded-details animate-fade-in">
+                <CheckCircle2 className="success-icon" size={16} />
+                <span className="file-name" title={referenceFileName || "Reference Track"}>
+                  {referenceFileName || "Reference Track"}
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onClearReference();
+                  }}
+                  className="btn-clear-asset"
+                  title="Clear reference subtitles"
+                  type="button"
+                >
+                  &times;
+                </button>
+              </div>
+            ) : (
+              <span className="placeholder">No reference subtitles loaded</span>
             )}
           </div>
         </div>
