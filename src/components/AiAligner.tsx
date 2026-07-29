@@ -1,6 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Brain, Sparkles, Cpu, AlertTriangle, Check, RefreshCw } from 'lucide-react';
+import { Mic, MicOff, Brain, Sparkles, Cpu, AlertTriangle, Check, RefreshCw, Settings } from 'lucide-react';
 import type { SubtitleCue } from '../utils/srtParser';
+
+interface AiSettings {
+  provider: 'chrome' | 'openai';
+  endpoint: string;
+  apiKey: string;
+  model: string;
+}
 
 interface AiAlignerProps {
   cues: SubtitleCue[];
@@ -8,6 +15,8 @@ interface AiAlignerProps {
   onUpdateCueTimings: (updates: { id: string; startTime: number; endTime: number }[]) => void;
   onSaveCurrentAsReference: () => void;
   onUpdateAllCues: (updatedCues: SubtitleCue[]) => void;
+  aiSettings: AiSettings;
+  onUpdateAiSettings: (newSettings: AiSettings) => void;
 }
 
 export const AiAligner: React.FC<AiAlignerProps> = ({
@@ -16,6 +25,8 @@ export const AiAligner: React.FC<AiAlignerProps> = ({
   onUpdateCueTimings,
   onSaveCurrentAsReference,
   onUpdateAllCues,
+  aiSettings,
+  onUpdateAiSettings,
 }) => {
   const [isListening, setIsListening] = useState(false);
   const [capturedTranscripts, setCapturedTranscripts] = useState<{ time: number; text: string }[]>([]);
@@ -23,6 +34,7 @@ export const AiAligner: React.FC<AiAlignerProps> = ({
   const [isAligning, setIsAligning] = useState(false);
   const [alignError, setAlignError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const recognitionRef = useRef<any>(null);
 
@@ -44,6 +56,13 @@ export const AiAligner: React.FC<AiAlignerProps> = ({
     'Arabic',
     'Turkish'
   ];
+
+  const updateSetting = (key: keyof AiSettings, value: string) => {
+    onUpdateAiSettings({
+      ...aiSettings,
+      [key]: value
+    });
+  };
 
   // Check Chrome AI capabilities on mount
   useEffect(() => {
@@ -156,9 +175,6 @@ export const AiAligner: React.FC<AiAlignerProps> = ({
       if (capturedTranscripts.length === 0) throw new Error("No speech timings recorded yet.");
 
       const win = window as any;
-      if (!win.ai || !win.ai.languageModel) {
-        throw new Error("Chrome AI LanguageModel API is not available.");
-      }
 
       // Format clean prompts
       const originalSubtitles = cues.map(c => ({ id: c.id, text: c.text }));
@@ -182,12 +198,44 @@ Recognized Speech Transcripts with timestamps:
 ${JSON.stringify(speechTranscripts)}
 `;
 
-      const session = await win.ai.languageModel.create({
-        systemPrompt: systemPrompt
-      });
+      let response = '';
 
-      const response = await session.prompt(userPrompt);
-      session.destroy();
+      if (aiSettings.provider === 'chrome') {
+        if (!win.ai || !win.ai.languageModel) {
+          throw new Error("Chrome AI LanguageModel API is not available.");
+        }
+        const session = await win.ai.languageModel.create({
+          systemPrompt: systemPrompt
+        });
+        response = await session.prompt(userPrompt);
+        session.destroy();
+      } else {
+        // OpenAI-compatible completions API call
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json'
+        };
+        if (aiSettings.apiKey) {
+          headers['Authorization'] = `Bearer ${aiSettings.apiKey}`;
+        }
+        const apiRes = await fetch(`${aiSettings.endpoint.replace(/\/$/, '')}/chat/completions`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            model: aiSettings.model,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt }
+            ],
+            temperature: 0.2
+          })
+        });
+        if (!apiRes.ok) {
+          const errText = await apiRes.text();
+          throw new Error(`API Error (${apiRes.status}): ${errText || apiRes.statusText}`);
+        }
+        const data = await apiRes.json();
+        response = data?.choices?.[0]?.message?.content || '';
+      }
 
       // Sanitization fallback if AI wrapped in markdown blocks
       const cleanJson = response.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -202,7 +250,7 @@ ${JSON.stringify(speechTranscripts)}
 
     } catch (err: any) {
       console.error("AI alignment error:", err);
-      setAlignError(err.message || "Failed to align with Chrome AI. Try fallback.");
+      setAlignError(err.message || "Failed to align with AI. Try fallback.");
     } finally {
       setIsAligning(false);
     }
@@ -254,18 +302,20 @@ ${JSON.stringify(speechTranscripts)}
         throw new Error("No subtitle cues loaded.");
       }
 
-      const win = window as any;
-      if (!win.ai || !win.ai.languageModel) {
-        throw new Error("Chrome built-in AI (window.ai.languageModel) is not available.");
-      }
-
       // Save original cues to reference track first
       onSaveCurrentAsReference();
 
-      // Initialize Gemini Session
-      const session = await win.ai.languageModel.create({
-        systemPrompt: "You are a precise, professional subtitle translator. You translate the input text to the target language exactly. Do not output any annotations, index markers, explanations, or metadata. Output ONLY the raw translation."
-      });
+      let session: any = null;
+      const win = window as any;
+
+      if (aiSettings.provider === 'chrome') {
+        if (!win.ai || !win.ai.languageModel) {
+          throw new Error("Chrome built-in AI (window.ai.languageModel) is not available.");
+        }
+        session = await win.ai.languageModel.create({
+          systemPrompt: "You are a precise, professional subtitle translator. You translate the input text to the target language exactly. Do not output any annotations, index markers, explanations, or metadata. Output ONLY the raw translation."
+        });
+      }
 
       const translatedCues = [...cues];
 
@@ -282,7 +332,37 @@ ${JSON.stringify(speechTranscripts)}
 Text to translate:
 ${cue.text}`;
 
-        const translationResponse = await session.prompt(prompt);
+        let translationResponse = '';
+
+        if (aiSettings.provider === 'chrome') {
+          translationResponse = await session.prompt(prompt);
+        } else {
+          // OpenAI-compatible completions API call
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json'
+          };
+          if (aiSettings.apiKey) {
+            headers['Authorization'] = `Bearer ${aiSettings.apiKey}`;
+          }
+          const apiRes = await fetch(`${aiSettings.endpoint.replace(/\/$/, '')}/chat/completions`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              model: aiSettings.model,
+              messages: [
+                { role: 'system', content: "You are a precise, professional subtitle translator. You translate the input text to the target language exactly. Do not output any annotations, index markers, explanations, or metadata. Output ONLY the raw translation." },
+                { role: 'user', content: prompt }
+              ],
+              temperature: 0.2
+            })
+          });
+          if (!apiRes.ok) {
+            const errText = await apiRes.text();
+            throw new Error(`API Error (${apiRes.status}): ${errText || apiRes.statusText}`);
+          }
+          const data = await apiRes.json();
+          translationResponse = data?.choices?.[0]?.message?.content || '';
+        }
         
         let cleanText = translationResponse.trim();
         if (cleanText.startsWith('"') && cleanText.endsWith('"')) {
@@ -297,14 +377,16 @@ ${cue.text}`;
         setTranslateProgress(Math.round(((i + 1) / cues.length) * 100));
       }
 
-      session.destroy();
+      if (session) {
+        session.destroy();
+      }
 
       onUpdateAllCues(translatedCues);
       setIsSuccess(true);
 
     } catch (err: any) {
       console.error("AI translation error:", err);
-      setAlignError(err.message || "Failed to translate subtitles with Chrome AI.");
+      setAlignError(err.message || "Failed to translate subtitles with AI.");
     } finally {
       setIsTranslating(false);
     }
@@ -322,7 +404,68 @@ ${cue.text}`;
       <div className="card-header-inline">
         <Sparkles className="icon text-primary animate-pulse" size={18} />
         <h4>AI Voice-to-Text Sync Assistant</h4>
+        <button
+          onClick={() => setShowSettings(!showSettings)}
+          className={`btn-icon-only-sm btn-settings-toggle ${showSettings ? 'active' : ''}`}
+          title="AI Configuration Settings"
+          type="button"
+        >
+          <Settings size={14} />
+        </button>
       </div>
+
+      {showSettings && (
+        <div className="ai-settings-block animate-slide-down">
+          <h5>AI Provider Configuration</h5>
+          <div className="settings-field">
+            <label>API Provider</label>
+            <select
+              value={aiSettings.provider}
+              onChange={(e) => updateSetting('provider', e.target.value)}
+              className="select-provider"
+              aria-label="Select AI API Provider"
+            >
+              <option value="chrome">Chrome Gemini Nano (Local)</option>
+              <option value="openai">OpenAI-compatible API (Ollama / vLLM / llama.cpp)</option>
+            </select>
+          </div>
+
+          {aiSettings.provider === 'openai' && (
+            <div className="openai-config-fields">
+              <div className="settings-field">
+                <label>API Endpoint URL</label>
+                <input
+                  type="text"
+                  value={aiSettings.endpoint}
+                  onChange={(e) => updateSetting('endpoint', e.target.value)}
+                  placeholder="http://localhost:11434/v1"
+                />
+              </div>
+              <div className="settings-field">
+                <label>API Key (Optional for local endpoints)</label>
+                <input
+                  type="password"
+                  value={aiSettings.apiKey}
+                  onChange={(e) => updateSetting('apiKey', e.target.value)}
+                  placeholder="Optional"
+                />
+              </div>
+              <div className="settings-field">
+                <label>Model Name</label>
+                <input
+                  type="text"
+                  value={aiSettings.model}
+                  onChange={(e) => updateSetting('model', e.target.value)}
+                  placeholder="llama3"
+                />
+              </div>
+              <div className="ai-tip-box">
+                <span>Tip: For Ollama, launch it with <code>OLLAMA_ORIGINS="*"</code> environment variable set to allow browser CORS requests.</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <p className="ai-description">
         Play your media <strong>out loud</strong>, click Start Listen, and let your microphone capture timings. 
@@ -374,7 +517,7 @@ ${cue.text}`;
       {capturedTranscripts.length > 0 && cues.length > 0 && (
         <div className="alignment-actions-panel">
           <div className="action-buttons-group">
-            {aiAvailable === 'yes' ? (
+            {aiSettings.provider === 'openai' || aiAvailable === 'yes' ? (
               <button
                 onClick={alignWithChromeAi}
                 disabled={isAligning}
@@ -382,12 +525,12 @@ ${cue.text}`;
                 type="button"
               >
                 <Brain size={16} />
-                {isAligning ? "Aligning..." : "Sync with Chrome AI"}
+                {isAligning ? "Aligning..." : "Sync with AI"}
               </button>
             ) : (
               <div className="ai-warning-box">
                 <AlertTriangle size={14} className="warning-icon" />
-                <span>Gemini Nano is unavailable. Using algorithmic fallback.</span>
+                <span>Gemini Nano is unavailable. Adjust settings or use fallback.</span>
               </div>
             )}
 
@@ -431,7 +574,7 @@ ${cue.text}`;
             Translate the active subtitle track locally. The original subtitles will be saved to the reference track for proofreading.
           </p>
 
-          {aiAvailable === 'yes' ? (
+          {aiSettings.provider === 'openai' || aiAvailable === 'yes' ? (
             <div className="translation-controls">
               <div className="translation-input-row">
                 <select
@@ -468,7 +611,7 @@ ${cue.text}`;
           ) : (
             <div className="ai-warning-box">
               <AlertTriangle size={14} className="warning-icon" />
-              <span>Chrome built-in AI (window.ai.languageModel) is unavailable. Enable local models in Chrome flags.</span>
+              <span>AI Translation is unavailable. Configure an API provider in settings.</span>
             </div>
           )}
         </div>

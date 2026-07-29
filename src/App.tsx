@@ -28,6 +28,32 @@ function App() {
   const [referenceCues, setReferenceCues] = useState<SubtitleCue[]>([]);
   const [referenceFileName, setReferenceFileName] = useState<string | null>(null);
 
+  // AI Endpoint Settings
+  const [aiSettings, setAiSettings] = useState<{
+    provider: 'chrome' | 'openai';
+    endpoint: string;
+    apiKey: string;
+    model: string;
+  }>(() => {
+    const saved = localStorage.getItem('deltascribe_ai_settings');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return {
+      provider: 'chrome',
+      endpoint: 'http://localhost:11434/v1',
+      apiKey: '',
+      model: 'llama3'
+    };
+  });
+
+  const handleUpdateAiSettings = (newSettings: typeof aiSettings) => {
+    setAiSettings(newSettings);
+    localStorage.setItem('deltascribe_ai_settings', JSON.stringify(newSettings));
+  };
+
   const playerRef = useRef<HTMLMediaElement | null>(null);
 
   // Active subtitle cue based on playback progress
@@ -455,6 +481,8 @@ function App() {
                       setSubtitleFileName(`${base}_translated.${ext}`);
                     }
                   }}
+                  aiSettings={aiSettings}
+                  onUpdateAiSettings={handleUpdateAiSettings}
                 />
               )}
               {!subtitleFileName && (
