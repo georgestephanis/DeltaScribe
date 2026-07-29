@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Plus, Trash2, Search, FastForward, SlidersHorizontal, Lock, Unlock, Scissors } from 'lucide-react';
+import { Plus, Trash2, Search, FastForward, SlidersHorizontal, Lock, Unlock, Scissors, RotateCcw } from 'lucide-react';
 import type { SubtitleCue } from '../utils/srtParser';
 
 interface SubtitleEditorProps {
@@ -66,6 +66,9 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
   const [shiftAmount, setShiftAmount] = useState('1.0');
   const [showShiftControls, setShowShiftControls] = useState(false);
   const listContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Local state to track offset input values while typing
+  const [offsetInputs, setOffsetInputs] = useState<Record<string, { startTime?: string; endTime?: string }>>({});
 
   // Find which cue is active at the current playback time
   const currentActiveCue = cues.find(
@@ -98,6 +101,40 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
     if (!isNaN(value)) {
       onChangeCue(id, { [field]: value });
     }
+  };
+
+  const getOffsetValue = (cueId: string, field: 'startTime' | 'endTime', currentVal: number, originalVal: number) => {
+    const typed = offsetInputs[cueId]?.[field];
+    if (typed !== undefined) return typed;
+    return (currentVal - originalVal).toFixed(2);
+  };
+
+  const handleOffsetChange = (id: string, field: 'startTime' | 'endTime', originalVal: number, valueStr: string) => {
+    setOffsetInputs((prev) => ({
+      ...prev,
+      [id]: {
+        ...prev[id],
+        [field]: valueStr,
+      },
+    }));
+
+    const parsed = parseFloat(valueStr);
+    if (!isNaN(parsed)) {
+      onChangeCue(id, { [field]: originalVal + parsed });
+    }
+  };
+
+  const handleOffsetBlur = (id: string, field: 'startTime' | 'endTime') => {
+    onFocusInput(false);
+    setOffsetInputs((prev) => {
+      const next = { ...prev };
+      if (next[id]) {
+        const fieldObj = { ...next[id] };
+        delete fieldObj[field];
+        next[id] = fieldObj;
+      }
+      return next;
+    });
   };
 
   const handleShiftClick = (direction: 'forward' | 'backward', target: 'all' | 'selected') => {
@@ -256,6 +293,44 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
                         onBlur={() => onFocusInput(false)}
                         className="time-input-box"
                       />
+
+                      {cue.originalStartTime !== undefined && (
+                        <div className="offset-badge-container">
+                          <span className="offset-symbol">Δ</span>
+                          <input
+                            type="text"
+                            value={getOffsetValue(cue.id, 'startTime', cue.startTime, cue.originalStartTime)}
+                            onChange={(e) => handleOffsetChange(cue.id, 'startTime', cue.originalStartTime!, e.target.value)}
+                            onFocus={() => onFocusInput(true)}
+                            onBlur={() => handleOffsetBlur(cue.id, 'startTime')}
+                            className="offset-input-box"
+                            title="Start time offset from original anchor (seconds)"
+                          />
+                          {cue.startTime !== cue.originalStartTime && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onChangeCue(cue.id, { startTime: cue.originalStartTime });
+                                setOffsetInputs((prev) => {
+                                  const next = { ...prev };
+                                  if (next[cue.id]) {
+                                    const f = { ...next[cue.id] };
+                                    delete f.startTime;
+                                    next[cue.id] = f;
+                                  }
+                                  return next;
+                                });
+                              }}
+                              className="btn-reset-offset"
+                              title="Reset start time to original anchor"
+                              type="button"
+                            >
+                              <RotateCcw size={10} />
+                            </button>
+                          )}
+                        </div>
+                      )}
+
                       <button
                         onClick={(e) => { e.stopPropagation(); onChangeCue(cue.id, { startTime: currentTime }); }}
                         className="btn-sync-time"
@@ -280,6 +355,44 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
                         onBlur={() => onFocusInput(false)}
                         className="time-input-box"
                       />
+
+                      {cue.originalEndTime !== undefined && (
+                        <div className="offset-badge-container">
+                          <span className="offset-symbol">Δ</span>
+                          <input
+                            type="text"
+                            value={getOffsetValue(cue.id, 'endTime', cue.endTime, cue.originalEndTime)}
+                            onChange={(e) => handleOffsetChange(cue.id, 'endTime', cue.originalEndTime!, e.target.value)}
+                            onFocus={() => onFocusInput(true)}
+                            onBlur={() => handleOffsetBlur(cue.id, 'endTime')}
+                            className="offset-input-box"
+                            title="End time offset from original anchor (seconds)"
+                          />
+                          {cue.endTime !== cue.originalEndTime && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onChangeCue(cue.id, { endTime: cue.originalEndTime });
+                                setOffsetInputs((prev) => {
+                                  const next = { ...prev };
+                                  if (next[cue.id]) {
+                                    const f = { ...next[cue.id] };
+                                    delete f.endTime;
+                                    next[cue.id] = f;
+                                  }
+                                  return next;
+                                });
+                              }}
+                              className="btn-reset-offset"
+                              title="Reset end time to original anchor"
+                              type="button"
+                            >
+                              <RotateCcw size={10} />
+                            </button>
+                          )}
+                        </div>
+                      )}
+
                       <button
                         onClick={(e) => { e.stopPropagation(); onChangeCue(cue.id, { endTime: currentTime }); }}
                         className="btn-sync-time"

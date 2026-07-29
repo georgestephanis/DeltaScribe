@@ -725,6 +725,59 @@ textarea::-webkit-scrollbar,
   font-size: 12px;
 }
 
+/* Subtitle Timing Offset Badge */
+.offset-badge-container {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.02);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0 6px;
+  height: 20px;
+}
+
+.offset-symbol {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--primary-light);
+  opacity: 0.85;
+}
+
+.offset-input-box {
+  background: transparent;
+  border: none;
+  width: 44px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 0;
+  text-align: center;
+  outline: none;
+}
+
+.offset-input-box:focus {
+  color: var(--primary-light);
+}
+
+.btn-reset-offset {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  transition: all 0.2s ease;
+}
+
+.btn-reset-offset:hover {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.1);
+}
+
 .btn-sync-time {
   background: rgba(255, 255, 255, 0.05);
   border: none;

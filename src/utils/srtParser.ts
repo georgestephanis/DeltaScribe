@@ -4,6 +4,8 @@ export interface SubtitleCue {
   startTime: number; // in seconds
   endTime: number; // in seconds
   text: string; // subtitle text (can be multiline)
+  originalStartTime?: number; // original start time anchor
+  originalEndTime?: number; // original end time anchor
 }
 
 /**
@@ -99,6 +101,8 @@ export function parseSRT(text: string): SubtitleCue[] {
       index,
       startTime,
       endTime,
+      originalStartTime: startTime,
+      originalEndTime: endTime,
       text
     });
 
