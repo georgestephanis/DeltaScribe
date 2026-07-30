@@ -15,6 +15,19 @@ function App() {
   const [subtitleTracks, setSubtitleTracks] = useState<{ id: string; name: string; cues: SubtitleCue[] }[]>([]);
   const [activeTrackId, setActiveTrackId] = useState<string | null>(null);
 
+  // Media Playback coordinates
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  
+  // Selection and editor states
+  const [selectedCueId, setSelectedCueId] = useState<string | null>(null);
+  const [isInputFocused, setIsInputFocused] = useState(false);
+  const [isTextEditable, setIsTextEditable] = useState(true);
+  const [exportFormat, setExportFormat] = useState<'srt' | 'vtt' | 'ttml'>('srt');
+  const [enableAlignment, setEnableAlignment] = useState(false);
+  const [enableFormatting, setEnableFormatting] = useState(false);
+
   // Derived state values computed on render
   const activeTrack = subtitleTracks.find(t => t.id === activeTrackId);
   const cues = activeTrack ? activeTrack.cues : [];
