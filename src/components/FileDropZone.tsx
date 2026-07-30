@@ -26,6 +26,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
   remoteLoadError,
 }) => {
   const [isDragActive, setIsDragActive] = useState(false);
+  const [unrecognizedFileError, setUnrecognizedFileError] = useState<string | null>(null);
   const mediaInputRef = useRef<HTMLInputElement>(null);
   const srtInputRef = useRef<HTMLInputElement>(null);
 
@@ -40,6 +41,8 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
   };
 
   const processFiles = (files: FileList) => {
+    const unrecognizedNames: string[] = [];
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const ext = file.name.split('.').pop()?.toLowerCase();
@@ -55,8 +58,16 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
           }
         };
         reader.readAsText(file);
+      } else {
+        unrecognizedNames.push(file.name);
       }
     }
+
+    setUnrecognizedFileError(
+      unrecognizedNames.length > 0
+        ? sprintf(__('Unrecognized file type, skipped: %s'), unrecognizedNames.join(', '))
+        : null
+    );
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -88,6 +99,11 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
       {remoteLoadError && (
         <div className="alert alert-danger" style={{ marginBottom: '16px' }}>
           <span>{remoteLoadError}</span>
+        </div>
+      )}
+      {unrecognizedFileError && (
+        <div className="alert alert-danger" style={{ marginBottom: '16px' }}>
+          <span>{unrecognizedFileError}</span>
         </div>
       )}
       <div
