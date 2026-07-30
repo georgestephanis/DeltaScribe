@@ -187,7 +187,7 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
           }}
           onInput={handleInput}
           className="rich-editor-content"
-          placeholder="Enter subtitle text..."
+          data-placeholder="Enter subtitle text..."
         />
       </div>
     );
