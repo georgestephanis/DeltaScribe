@@ -40,15 +40,19 @@ Allow loading a correctly-timed secondary subtitle file (often in a different la
 
 ---
 
-## [x] Feature 3: WebVTT Format Support
-Extend support to parse and write WebVTT (`.vtt`) files natively, which are natively supported by modern HTML5 browsers and media frameworks.
+## [x] Feature 3: WebVTT & TTML Format Support
+Extend support to parse and write WebVTT (`.vtt`) and TTML (`.ttml` / `.xml`) files natively. This covers both active and reference tracks, and supports export/download across all formats.
 
 ### Implementation Strategy
 1. **VTT Parsing Rules**:
    - Strip the leading `WEBVTT` file header.
    - Timestamps format is `HH:MM:SS.mmm` (dot instead of comma separator).
-2. **Utility updates**: Extend `srtParser.ts` or create `vttParser.ts` with VTT loaders.
-3. **Toggle Output**: Add a dropdown in the Export toolbar to choose between `.srt` and `.vtt` file download outputs.
+2. **TTML Parsing & Generating Rules**:
+   - Parse XML elements using the client-side `DOMParser`.
+   - Support offset-times (seconds, milliseconds, etc.) and clock-times.
+   - Generate standard compliant timed text XML formatting templates on export.
+3. **Utility updates**: Refactored subtitle parsers into clean, format-specific submodules inside `src/utils/subtitles/`.
+4. **Toggle Output**: Add a dropdown in the Export toolbar to choose between `.srt`, `.vtt`, and `.ttml` file download outputs.
 
 ---
 
