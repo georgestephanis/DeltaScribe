@@ -6,6 +6,7 @@ import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { parseSRT, formatSRT, formatVTT, formatTTML, type SubtitleCue } from './utils/subtitles';
 import { Download, Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
 import { AiAligner } from './components/AiAligner';
+import { __ } from './utils/i18n';
 
 function App() {
   // Loaded assets state
@@ -534,14 +535,14 @@ function App() {
           <div className="app-logo">
             <Sparkles size={24} />
           </div>
-          <h1>DeltaScribe Studio</h1>
+          <h1>{__('DeltaScribe Studio')}</h1>
         </div>
         <div className="header-actions-group">
           {!mediaFile && <KeyboardShortcutsHelp />}
           {mediaFile && (
             <button onClick={handleReset} className="btn btn-secondary btn-sm" type="button">
               <RefreshCw size={14} />
-              Reset Workspace
+              {__('Reset Workspace')}
             </button>
           )}
           {cues.length > 0 && (
@@ -565,7 +566,7 @@ function App() {
                 </select>
                 <button onClick={handleExport} className="btn btn-primary btn-sm" type="button">
                   <Download size={14} />
-                  Export
+                  {__('Export')}
                 </button>
                 {submitUrl && (
                   <button
@@ -574,7 +575,7 @@ function App() {
                     type="button"
                     disabled={isSubmitting}
                   >
-                    {isSubmitting ? "Submitting..." : "Submit"}
+                    {isSubmitting ? __('Submitting...') : __('Submit')}
                   </button>
                 )}
               </div>

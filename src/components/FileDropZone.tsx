@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Upload, FileVideo, FileAudio, FileText, CheckCircle2 } from 'lucide-react';
+import { __, sprintf } from '../utils/i18n';
 
 interface FileDropZoneProps {
   mediaFile: { name: string; type: string; url: string } | null;
@@ -115,9 +116,9 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
           <div className="icon-group">
             <Upload className="main-icon" size={48} />
           </div>
-          <h3>Drag & Drop Files Here</h3>
+          <h3>{__('Drag & Drop Files Here')}</h3>
           <p className="description">
-            Drop your video/audio file AND subtitle (.srt, .vtt, or .ttml) file, or select them below.
+            {__('Drop your video/audio file AND subtitle (.srt, .vtt, or .ttml) file, or select them below.')}
           </p>
 
           <div className="import-controls">
@@ -126,14 +127,14 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
               className="btn btn-primary"
               type="button"
             >
-              Select Media File
+              {__('Select Media File')}
             </button>
             <button
               onClick={() => srtInputRef.current?.click()}
               className="btn btn-secondary"
               type="button"
             >
-              {subtitleTracks.length > 0 ? "Add Subtitle File" : "Select Subtitle File"}
+              {subtitleTracks.length > 0 ? __('Add Subtitle File') : __('Select Subtitle File')}
             </button>
             {subtitleTracks.length === 0 && (
               <button
@@ -141,7 +142,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
                 className="btn btn-text"
                 type="button"
               >
-                Create New Subtitles
+                {__('Create New Subtitles')}
               </button>
             )}
           </div>
@@ -156,7 +157,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
             ) : (
               <FileVideo className="icon text-muted" />
             )}
-            <h4>Media File</h4>
+            <h4>{__('Media File')}</h4>
           </div>
           <div className="card-body">
             {mediaFile ? (
@@ -165,7 +166,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
                 <span className="file-name" title={mediaFile.name}>{mediaFile.name}</span>
               </div>
             ) : (
-              <span className="placeholder">No media file loaded</span>
+              <span className="placeholder">{__('No media file loaded')}</span>
             )}
           </div>
         </div>
@@ -173,7 +174,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
         <div className="asset-card full-width-card">
           <div className="card-header">
             <FileText className={`icon ${subtitleTracks.length > 0 ? 'text-primary' : 'text-muted'}`} />
-            <h4>Subtitle Tracks ({subtitleTracks.length})</h4>
+            <h4>{sprintf(__('Subtitle Tracks (%d)'), subtitleTracks.length)}</h4>
           </div>
           <div className="card-body">
             {subtitleTracks.length > 0 ? (
@@ -191,7 +192,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
                           className="track-radio"
                         />
                         <span className="track-status-badge">
-                          {isActive ? 'Active Edit' : 'Reference'}
+                          {isActive ? __('Active Edit') : __('Reference')}
                         </span>
                       </label>
                       <span className="file-name" title={track.name}>
@@ -214,7 +215,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
                 })}
               </div>
             ) : (
-              <span className="placeholder">No subtitle files loaded. Drop subtitle files here to add them.</span>
+              <span className="placeholder">{__('No subtitle files loaded. Drop subtitle files here to add them.')}</span>
             )}
           </div>
         </div>
