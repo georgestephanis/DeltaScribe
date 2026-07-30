@@ -116,21 +116,17 @@ textarea::-webkit-scrollbar,
 }
 
 .app-logo {
-  background: linear-gradient(135deg, var(--primary), var(--success));
-  color: white;
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 15px var(--primary-glow);
 }
 
 .app-logo-img {
-  width: 24px;
-  height: 24px;
+  width: 46px;
+  height: 46px;
   object-fit: contain;
+  filter: drop-shadow(0 4px 12px var(--primary-glow));
 }
 
 .brand-section h1 {
