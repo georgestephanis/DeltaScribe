@@ -10,24 +10,24 @@ import { AiAligner } from './components/AiAligner';
 function App() {
   // Loaded assets state
   const [mediaFile, setMediaFile] = useState<{ name: string; type: string; url: string; isRemote?: boolean } | null>(null);
-  const [subtitleFileName, setSubtitleFileName] = useState<string | null>(null);
-  const [cues, setCues] = useState<SubtitleCue[]>([]);
-  
-  // Media Playback coordinates
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  
-  // Selection and editor states
-  const [selectedCueId, setSelectedCueId] = useState<string | null>(null);
-  const [isInputFocused, setIsInputFocused] = useState(false);
-  const [isTextEditable, setIsTextEditable] = useState(true);
-  const [exportFormat, setExportFormat] = useState<'srt' | 'vtt' | 'ttml'>('srt');
-  const [enableAlignment, setEnableAlignment] = useState(false);
-  const [enableFormatting, setEnableFormatting] = useState(false);
+  const [subtitleTracks, setSubtitleTracks] = useState<{ id: string; name: string; cues: SubtitleCue[] }[]>([]);
+  const [activeTrackId, setActiveTrackId] = useState<string | null>(null);
 
-  const [referenceCues, setReferenceCues] = useState<SubtitleCue[]>([]);
-  const [referenceFileName, setReferenceFileName] = useState<string | null>(null);
+  // Derived state values computed on render
+  const activeTrack = subtitleTracks.find(t => t.id === activeTrackId);
+  const cues = activeTrack ? activeTrack.cues : [];
+  const subtitleFileName = activeTrack ? activeTrack.name : null;
+
+  const referenceTracks = subtitleTracks.filter(t => t.id !== activeTrackId);
+  const referenceCues = referenceTracks.length > 0 ? referenceTracks[0].cues : [];
+
+  const setActiveCues = useCallback((updater: (prev: SubtitleCue[]) => SubtitleCue[]) => {
+    setSubtitleTracks(prevTracks => 
+      prevTracks.map(t => t.id === activeTrackId ? { ...t, cues: updater(t.cues) } : t)
+    );
+  }, [activeTrackId]);
+
+  // Reference subtitle track states
   const [remoteLoadError, setRemoteLoadError] = useState<string | null>(null);
   const [submitUrl, setSubmitUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -135,8 +135,10 @@ function App() {
 
   const handleSubtitlesLoaded = (text: string, fileName: string) => {
     const parsed = parseSRT(text);
-    setCues(parsed);
-    setSubtitleFileName(fileName);
+    const newTrackId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9);
+    const newTrack = { id: newTrackId, name: fileName, cues: parsed };
+    setSubtitleTracks(prev => [...prev, newTrack]);
+    setActiveTrackId(prev => prev || newTrackId);
 
     const ext = fileName.split('.').pop()?.toLowerCase();
     if (ext === 'vtt') {
@@ -162,33 +164,32 @@ function App() {
     }
   };
 
-  const handleReferenceSubtitlesLoaded = (text: string, fileName: string) => {
-    const parsed = parseSRT(text);
-    setReferenceCues(parsed);
-    setReferenceFileName(fileName);
-  };
-
-  const handleClearReference = () => {
-    setReferenceCues([]);
-    setReferenceFileName(null);
-  };
-
   const handleCopyReferenceTiming = (cueId: string, startTime: number, endTime: number) => {
     handleUpdateCue(cueId, { startTime, endTime });
   };
 
   const handleCreateNewSubtitles = () => {
-    setCues([]);
-    setSubtitleFileName('new_subtitles.srt');
+    const newTrackId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9);
+    const initialCueId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9);
+    const initialCue: SubtitleCue = {
+      id: initialCueId,
+      index: 1,
+      startTime: playerRef.current?.currentTime || 0,
+      endTime: (playerRef.current?.currentTime || 0) + 2.0,
+      text: 'New Subtitle'
+    };
+    const newTrack = { id: newTrackId, name: 'new_subtitles.srt', cues: [initialCue] };
+    setSubtitleTracks(prev => [...prev, newTrack]);
+    setActiveTrackId(newTrackId);
     setExportFormat('srt');
-    handleAddCue(); // Insert an initial cue
+    setSelectedCueId(initialCueId);
   };
 
   // Cue mutation actions
   const handleAddCue = useCallback((insertAfterId?: string) => {
     const newId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9);
     
-    setCues((prevCues) => {
+    setActiveCues((prevCues) => {
       let newCueStart = playerRef.current?.currentTime || 0;
       
       if (prevCues.length > 0) {
@@ -230,10 +231,10 @@ function App() {
     });
 
     setSelectedCueId(newId);
-  }, []);
+  }, [setActiveCues]);
 
   const handleUpdateCue = useCallback((id: string, updatedFields: Partial<SubtitleCue>) => {
-    setCues((prevCues) => {
+    setActiveCues((prevCues) => {
       const updated = prevCues.map((cue) => {
         if (cue.id === id) {
           const result = { ...cue, ...updatedFields };
@@ -256,10 +257,10 @@ function App() {
         index: idx + 1
       }));
     });
-  }, []);
+  }, [setActiveCues]);
 
   const handleDeleteCue = useCallback((id: string) => {
-    setCues((prevCues) => {
+    setActiveCues((prevCues) => {
       const filtered = prevCues.filter((cue) => cue.id !== id);
       const reindexed = filtered.map((cue, idx) => ({
         ...cue,
@@ -275,10 +276,10 @@ function App() {
       
       return reindexed;
     });
-  }, []);
+  }, [setActiveCues]);
 
   const handleUpdateMultipleCueTimings = useCallback((updates: { id: string; startTime: number; endTime: number }[]) => {
-    setCues((prevCues) => {
+    setActiveCues((prevCues) => {
       const updated = prevCues.map((cue) => {
         const match = updates.find((u) => u.id === cue.id);
         if (match) {
@@ -296,10 +297,10 @@ function App() {
         index: idx + 1
       }));
     });
-  }, []);
+  }, [setActiveCues]);
 
   const handleSplitCue = useCallback((id: string) => {
-    setCues((prevCues) => {
+    setActiveCues((prevCues) => {
       const cueIndex = prevCues.findIndex((c) => c.id === id);
       if (cueIndex === -1) return prevCues;
 
@@ -356,10 +357,10 @@ function App() {
         index: idx + 1,
       }));
     });
-  }, []);
+  }, [setActiveCues]);
 
   const handleShiftTimes = useCallback((seconds: number, target: 'all' | 'selected') => {
-    setCues((prevCues) => {
+    setActiveCues((prevCues) => {
       const updated = prevCues.map((cue) => {
         if (target === 'all' || (target === 'selected' && cue.id === selectedCueId)) {
           const start = Math.max(0, cue.startTime + seconds);
@@ -378,7 +379,8 @@ function App() {
         index: idx + 1
       }));
     });
-  }, [selectedCueId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setActiveCues, selectedCueId]);
 
   const handleSeek = (time: number) => {
     const player = playerRef.current;
@@ -394,14 +396,12 @@ function App() {
         URL.revokeObjectURL(mediaFile.url);
       }
       setMediaFile(null);
-      setSubtitleFileName(null);
-      setCues([]);
+      setSubtitleTracks([]);
+      setActiveTrackId(null);
       setSelectedCueId(null);
       setCurrentTime(0);
       setDuration(0);
       setIsPlaying(false);
-      setReferenceCues([]);
-      setReferenceFileName(null);
     }
   };
 
@@ -524,6 +524,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInputFocused, selectedCueId, isPlaying, handleAddCue, handleUpdateCue]);
 
   return (
@@ -587,14 +588,20 @@ function App() {
           <div style={{ gridColumn: '1 / -1' }}>
             <FileDropZone
               mediaFile={mediaFile}
-              hasSubtitles={cues.length > 0}
-              subtitleFileName={subtitleFileName}
-              referenceFileName={referenceFileName}
-              hasReferenceSubtitles={referenceCues.length > 0}
+              subtitleTracks={subtitleTracks}
+              activeTrackId={activeTrackId}
+              onSelectActiveTrack={setActiveTrackId}
+              onRemoveTrack={(id) => {
+                setSubtitleTracks(prev => {
+                  const next = prev.filter(t => t.id !== id);
+                  if (activeTrackId === id) {
+                    setActiveTrackId(next.length > 0 ? next[0].id : null);
+                  }
+                  return next;
+                });
+              }}
               onMediaLoaded={handleMediaLoaded}
               onSubtitlesLoaded={handleSubtitlesLoaded}
-              onReferenceSubtitlesLoaded={handleReferenceSubtitlesLoaded}
-              onClearReference={handleClearReference}
               onCreateNewSubtitles={handleCreateNewSubtitles}
               remoteLoadError={remoteLoadError}
             />
@@ -622,15 +629,31 @@ function App() {
                   getCurrentTime={() => playerRef.current?.currentTime || 0}
                   onUpdateCueTimings={handleUpdateMultipleCueTimings}
                   onSaveCurrentAsReference={() => {
-                    setReferenceCues([...cues]);
-                    setReferenceFileName(subtitleFileName ? `original_${subtitleFileName}` : 'original_subtitles.srt');
+                    if (activeTrack) {
+                      const newTrackId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9);
+                      const newTrack = {
+                        id: newTrackId,
+                        name: `original_${activeTrack.name}`,
+                        cues: [...activeTrack.cues]
+                      };
+                      setSubtitleTracks(prev => [...prev, newTrack]);
+                    }
                   }}
                   onUpdateAllCues={(updatedCues) => {
-                    setCues(updatedCues);
-                    if (subtitleFileName) {
-                      const ext = subtitleFileName.split('.').pop()?.toLowerCase();
-                      const base = subtitleFileName.replace(/\.(srt|vtt)$/i, '');
-                      setSubtitleFileName(`${base}_translated.${ext}`);
+                    setActiveCues(() => updatedCues);
+                    if (activeTrackId) {
+                      setSubtitleTracks(prev => prev.map(t => {
+                        if (t.id === activeTrackId) {
+                          const ext = t.name.split('.').pop()?.toLowerCase();
+                          const base = t.name.replace(/\.(srt|vtt|xml|ttml)$/i, '');
+                          return {
+                            ...t,
+                            name: `${base}_translated.${ext || 'srt'}`,
+                            cues: updatedCues
+                          };
+                        }
+                        return t;
+                      }));
                     }
                   }}
                   aiSettings={aiSettings}
