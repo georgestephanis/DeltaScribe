@@ -675,7 +675,7 @@ function App() {
 
       <footer className="app-footer">
         <p>
-          DeltaScribe Studio is free and open-source software under the GPLv2+ license. 
+          DeltaScribe Studio is free and open-source software under the GPLv3 license. 
           Contributions and details are available on <a href="https://github.com/georgestephanis/DeltaScribe" target="_blank" rel="noopener noreferrer">GitHub</a>.
         </p>
       </footer>

@@ -100,7 +100,7 @@ When users click the green **Submit** button, DeltaScribe makes a `POST` request
 
 ## License
 
-DeltaScribe Studio is free and open-source software licensed under the **GNU GPLv2 or later (GPLv2+)**.
+DeltaScribe Studio is free and open-source software licensed under the **GNU GPLv3 (or any later version)** to ensure compatibility with Apache 2.0 dependencies.
 
 ### Dependency Licenses
 
