@@ -28,6 +28,19 @@ function App() {
   const [referenceCues, setReferenceCues] = useState<SubtitleCue[]>([]);
   const [referenceFileName, setReferenceFileName] = useState<string | null>(null);
 
+  // Compute reactive warning if chosen export format will strip layout settings
+  const hasAlignOrLine = cues.some(c => c.align !== undefined || c.line !== undefined);
+  const hasLineOnly = cues.some(c => c.line !== undefined);
+
+  let lossyWarning: string | null = null;
+  if (cues.length > 0) {
+    if (exportFormat === 'srt' && hasAlignOrLine) {
+      lossyWarning = 'SRT strips layout alignment/position settings';
+    } else if (exportFormat === 'ttml' && hasLineOnly) {
+      lossyWarning = 'TTML strips vertical position placement';
+    }
+  }
+
   // AI Endpoint Settings
   const [aiSettings, setAiSettings] = useState<{
     provider: 'chrome' | 'openai';
@@ -431,21 +444,29 @@ function App() {
             </button>
           )}
           {cues.length > 0 && (
-            <div className="export-group">
-              <select
-                value={exportFormat}
-                onChange={(e) => setExportFormat(e.target.value as 'srt' | 'vtt' | 'ttml')}
-                className="select-format"
-                aria-label="Select export format"
-              >
-                <option value="srt">SRT</option>
-                <option value="vtt">VTT</option>
-                <option value="ttml">TTML</option>
-              </select>
-              <button onClick={handleExport} className="btn btn-primary btn-sm" type="button">
-                <Download size={14} />
-                Export
-              </button>
+            <div className="export-container">
+              {lossyWarning && (
+                <div className="lossy-warning" title={`${lossyWarning}. The export will be lossy.`}>
+                  <AlertCircle size={14} />
+                  <span>{lossyWarning}</span>
+                </div>
+              )}
+              <div className="export-group">
+                <select
+                  value={exportFormat}
+                  onChange={(e) => setExportFormat(e.target.value as 'srt' | 'vtt' | 'ttml')}
+                  className="select-format"
+                  aria-label="Select export format"
+                >
+                  <option value="srt">SRT</option>
+                  <option value="vtt">VTT</option>
+                  <option value="ttml">TTML</option>
+                </select>
+                <button onClick={handleExport} className="btn btn-primary btn-sm" type="button">
+                  <Download size={14} />
+                  Export
+                </button>
+              </div>
             </div>
           )}
         </div>

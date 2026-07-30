@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Plus, Trash2, Search, FastForward, SlidersHorizontal, Lock, Unlock, Scissors, RotateCcw, Copy } from 'lucide-react';
+import { Plus, Trash2, Search, FastForward, SlidersHorizontal, Lock, Unlock, Scissors, RotateCcw, Copy, Settings, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import type { SubtitleCue } from '../utils/subtitles';
 
 interface SubtitleEditorProps {
@@ -73,6 +73,7 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
   
   // Local state to track offset input values while typing
   const [offsetInputs, setOffsetInputs] = useState<Record<string, { startTime?: string; endTime?: string }>>({});
+  const [openSettingsCueId, setOpenSettingsCueId] = useState<string | null>(null);
 
   // Find which cue is active at the current playback time
   const currentActiveCue = cues.find(
@@ -420,6 +421,17 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
                       <FastForward size={14} />
                     </button>
                     <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenSettingsCueId(openSettingsCueId === cue.id ? null : cue.id);
+                      }}
+                      className={`btn-icon-only-sm ${openSettingsCueId === cue.id ? 'active' : ''}`}
+                      title="Adjust alignment and line placement"
+                      type="button"
+                    >
+                      <Settings size={14} />
+                    </button>
+                    <button
                       onClick={(e) => { e.stopPropagation(); onSplitCue(cue.id); }}
                       className="btn-icon-only-sm"
                       title="Split subtitle into two chunks"
@@ -445,6 +457,69 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
                     </button>
                   </div>
                 </div>
+
+                {openSettingsCueId === cue.id && (
+                  <div className="cue-settings-drawer">
+                    <div className="settings-group">
+                      <span className="settings-label">Alignment:</span>
+                      <div className="btn-group">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onChangeCue(cue.id, { align: 'left' });
+                          }}
+                          className={`btn-toggle-sm ${cue.align === 'left' ? 'active' : ''}`}
+                          title="Align Left"
+                          type="button"
+                        >
+                          <AlignLeft size={12} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onChangeCue(cue.id, { align: 'center' });
+                          }}
+                          className={`btn-toggle-sm ${cue.align === 'center' || !cue.align ? 'active' : ''}`}
+                          title="Align Center"
+                          type="button"
+                        >
+                          <AlignCenter size={12} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onChangeCue(cue.id, { align: 'right' });
+                          }}
+                          className={`btn-toggle-sm ${cue.align === 'right' ? 'active' : ''}`}
+                          title="Align Right"
+                          type="button"
+                        >
+                          <AlignRight size={12} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="settings-group">
+                      <span className="settings-label">Position:</span>
+                      <select
+                        value={cue.line || 'auto'}
+                        onChange={(e) => {
+                          onChangeCue(cue.id, { line: e.target.value === 'auto' ? undefined : e.target.value });
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="select-position-sm"
+                        aria-label="Text vertical position placement"
+                      >
+                        <option value="auto">Auto (Bottom)</option>
+                        <option value="10%">Top (10%)</option>
+                        <option value="30%">Upper Third (30%)</option>
+                        <option value="50%">Middle (50%)</option>
+                        <option value="70%">Lower Third (70%)</option>
+                        <option value="90%">Bottom (90%)</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
 
                 <div className="cue-body">
                   <AutoExpandingTextarea

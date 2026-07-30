@@ -6,4 +6,6 @@ export interface SubtitleCue {
   text: string; // subtitle text (can be multiline)
   originalStartTime?: number; // original start time anchor
   originalEndTime?: number; // original end time anchor
+  align?: 'left' | 'center' | 'right';
+  line?: string; // WebVTT line settings, e.g. "10%", "90%", "auto"
 }

@@ -22,7 +22,13 @@ export function formatVTT(cues: SubtitleCue[]): string {
       const index = idx + 1;
       const startTimeStr = formatTimestamp(cue.startTime).replace(',', '.');
       const endTimeStr = formatTimestamp(cue.endTime).replace(',', '.');
-      const times = `${startTimeStr} --> ${endTimeStr}`;
+      
+      const settingsParts: string[] = [];
+      if (cue.align) settingsParts.push(`align:${cue.align}`);
+      if (cue.line) settingsParts.push(`line:${cue.line}`);
+      const settingsStr = settingsParts.length > 0 ? ' ' + settingsParts.join(' ') : '';
+
+      const times = `${startTimeStr} --> ${endTimeStr}${settingsStr}`;
       return `${index}\n${times}\n${cue.text}`;
     })
     .join('\n\n');

@@ -65,6 +65,12 @@ export function parseTTML(xmlText: string): SubtitleCue[] {
     const endTime = parseTTMLTime(endAttr);
     const text = p.textContent || '';
 
+    const alignAttr = p.getAttribute('tts:textAlign') || p.getAttribute('textAlign');
+    let align: 'left' | 'center' | 'right' | undefined;
+    if (alignAttr === 'left' || alignAttr === 'center' || alignAttr === 'right') {
+      align = alignAttr;
+    }
+
     cues.push({
       id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
       index,
@@ -72,7 +78,8 @@ export function parseTTML(xmlText: string): SubtitleCue[] {
       endTime,
       originalStartTime: startTime,
       originalEndTime: endTime,
-      text: text.trim()
+      text: text.trim(),
+      align
     });
     index++;
   }
@@ -110,7 +117,9 @@ export function formatTTML(cues: SubtitleCue[]): string {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&apos;');
     
-    return `      <p begin="${formatTTMLTimestamp(cue.startTime)}" end="${formatTTMLTimestamp(cue.endTime)}">${escapedText}</p>`;
+    const alignAttr = cue.align ? ` tts:textAlign="${cue.align}"` : '';
+    
+    return `      <p begin="${formatTTMLTimestamp(cue.startTime)}" end="${formatTTMLTimestamp(cue.endTime)}"${alignAttr}>${escapedText}</p>`;
   }).join('\n');
 
   return `<?xml version="1.0" encoding="utf-8"?>

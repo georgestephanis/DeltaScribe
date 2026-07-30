@@ -37,9 +37,26 @@ export function parseSRT(text: string): SubtitleCue[] {
 
     const startTime = parseTimestamp(timeParts[0]);
     
-    // Extract the end time token (ignoring any trailing WebVTT cue settings like align:middle line:90%)
-    const endTimePart = timeParts[1].trim().split(/\s+/)[0];
+    // Extract the end time token and any trailing settings
+    const endTimeTokens = timeParts[1].trim().split(/\s+/);
+    const endTimePart = endTimeTokens[0];
     const endTime = parseTimestamp(endTimePart);
+
+    // Parse custom alignment/line parameters
+    let align: 'left' | 'center' | 'right' | undefined;
+    let line: string | undefined;
+
+    const settingsTokens = endTimeTokens.slice(1);
+    for (const token of settingsTokens) {
+      if (token.startsWith('align:')) {
+        const val = token.split(':')[1];
+        if (val === 'left' || val === 'center' || val === 'right') {
+          align = val;
+        }
+      } else if (token.startsWith('line:')) {
+        line = token.split(':')[1];
+      }
+    }
 
     // Text is everything after the timeline line
     const cueText = lines.slice(timeLineIndex + 1).join('\n');
@@ -60,7 +77,9 @@ export function parseSRT(text: string): SubtitleCue[] {
       endTime,
       originalStartTime: startTime,
       originalEndTime: endTime,
-      text: cueText
+      text: cueText,
+      align,
+      line
     });
 
     tempIndex++;
