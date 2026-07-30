@@ -3,7 +3,7 @@ import { FileDropZone } from './components/FileDropZone';
 import { MediaPanel } from './components/MediaPanel';
 import { SubtitleEditor } from './components/SubtitleEditor';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
-import { parseSRT, formatSRT, formatVTT, formatTTML, type SubtitleCue } from './utils/srtParser';
+import { parseSRT, formatSRT, formatVTT, formatTTML, type SubtitleCue } from './utils/subtitles';
 import { Download, Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
 import { AiAligner } from './components/AiAligner';
 

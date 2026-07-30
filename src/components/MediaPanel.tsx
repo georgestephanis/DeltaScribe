@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Play, Pause, RotateCcw, SkipBack, SkipForward, Volume2, Activity, BarChart3, Waves } from 'lucide-react';
-import type { SubtitleCue } from '../utils/srtParser';
+import type { SubtitleCue } from '../utils/subtitles';
 
 interface MediaPanelProps {
   mediaFile: { name: string; type: string; url: string };

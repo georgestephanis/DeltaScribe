@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Brain, Sparkles, Cpu, AlertTriangle, Check, RefreshCw, Settings } from 'lucide-react';
-import type { SubtitleCue } from '../utils/srtParser';
+import type { SubtitleCue } from '../utils/subtitles';
 
 interface AiSettings {
   provider: 'chrome' | 'openai';

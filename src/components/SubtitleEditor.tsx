@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Plus, Trash2, Search, FastForward, SlidersHorizontal, Lock, Unlock, Scissors, RotateCcw, Copy } from 'lucide-react';
-import type { SubtitleCue } from '../utils/srtParser';
+import type { SubtitleCue } from '../utils/subtitles';
 
 interface SubtitleEditorProps {
   cues: SubtitleCue[];
