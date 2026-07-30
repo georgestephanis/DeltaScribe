@@ -48,7 +48,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
 
       if (file.type.startsWith('video/') || file.type.startsWith('audio/') || ['mp4', 'webm', 'ogg', 'mp3', 'wav', 'm4a'].includes(ext || '')) {
         onMediaLoaded(file);
-      } else if (ext === 'srt' || ext === 'vtt') {
+      } else if (ext === 'srt' || ext === 'vtt' || ext === 'xml' || ext === 'ttml') {
         const reader = new FileReader();
         reader.onload = (event) => {
           const text = event.target?.result as string;
@@ -122,14 +122,14 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
         <input
           ref={srtInputRef}
           type="file"
-          accept=".srt,.vtt"
+          accept=".srt,.vtt,.xml,.ttml"
           className="hidden-input"
           onChange={handleSrtChange}
         />
         <input
           ref={refSubInputRef}
           type="file"
-          accept=".srt,.vtt"
+          accept=".srt,.vtt,.xml,.ttml"
           className="hidden-input"
           onChange={handleRefSubChange}
         />
@@ -140,7 +140,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
           </div>
           <h3>Drag & Drop Files Here</h3>
           <p className="description">
-            Drop your video/audio file AND subtitle (.srt or .vtt) file, or select them below.
+            Drop your video/audio file AND subtitle (.srt, .vtt, or .ttml) file, or select them below.
           </p>
 
           <div className="import-controls">
@@ -156,7 +156,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
               className="btn btn-secondary"
               type="button"
             >
-              {hasSubtitles ? "Select Active SRT/VTT" : "Select SRT/VTT File"}
+              {hasSubtitles ? "Select Active Subtitles" : "Select Subtitle File"}
             </button>
             {hasSubtitles && (
               <button
@@ -164,7 +164,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
                 className="btn btn-secondary"
                 type="button"
               >
-                Select Reference SRT/VTT
+                Select Reference Subtitles
               </button>
             )}
             {!hasSubtitles && (
@@ -205,7 +205,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
         <div className="asset-card">
           <div className="card-header">
             <FileText className={`icon ${hasSubtitles ? 'text-sub' : 'text-muted'}`} />
-            <h4>Active Subtitles (SRT/VTT)</h4>
+            <h4>Active Subtitles (SRT/VTT/TTML)</h4>
           </div>
           <div className="card-body">
             {hasSubtitles ? (
@@ -224,7 +224,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
         <div className="asset-card">
           <div className="card-header">
             <FileText className={`icon ${hasReferenceSubtitles ? 'text-audio' : 'text-muted'}`} />
-            <h4>Reference Subtitles (SRT/VTT)</h4>
+            <h4>Reference Subtitles (SRT/VTT/TTML)</h4>
           </div>
           <div className="card-body">
             {hasReferenceSubtitles ? (

@@ -3,7 +3,7 @@ import { FileDropZone } from './components/FileDropZone';
 import { MediaPanel } from './components/MediaPanel';
 import { SubtitleEditor } from './components/SubtitleEditor';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
-import { parseSRT, formatSRT, formatVTT, type SubtitleCue } from './utils/srtParser';
+import { parseSRT, formatSRT, formatVTT, formatTTML, type SubtitleCue } from './utils/srtParser';
 import { Download, Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
 import { AiAligner } from './components/AiAligner';
 
@@ -22,7 +22,7 @@ function App() {
   const [selectedCueId, setSelectedCueId] = useState<string | null>(null);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isTextEditable, setIsTextEditable] = useState(true);
-  const [exportFormat, setExportFormat] = useState<'srt' | 'vtt'>('srt');
+  const [exportFormat, setExportFormat] = useState<'srt' | 'vtt' | 'ttml'>('srt');
 
   // Reference subtitle track states
   const [referenceCues, setReferenceCues] = useState<SubtitleCue[]>([]);
@@ -83,6 +83,8 @@ function App() {
     const ext = fileName.split('.').pop()?.toLowerCase();
     if (ext === 'vtt') {
       setExportFormat('vtt');
+    } else if (ext === 'ttml' || ext === 'xml') {
+      setExportFormat('ttml');
     } else {
       setExportFormat('srt');
     }
@@ -337,15 +339,24 @@ function App() {
 
   const handleExport = () => {
     if (cues.length === 0) return;
-    const formatted = exportFormat === 'vtt' ? formatVTT(cues) : formatSRT(cues);
-    const blob = new Blob([formatted], { type: 'text/plain;charset=utf-8' });
+    
+    let formatted = '';
+    if (exportFormat === 'vtt') {
+      formatted = formatVTT(cues);
+    } else if (exportFormat === 'ttml') {
+      formatted = formatTTML(cues);
+    } else {
+      formatted = formatSRT(cues);
+    }
+    
+    const blob = new Blob([formatted], { type: exportFormat === 'ttml' ? 'application/xml;charset=utf-8' : 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     
     // Get export name
     let exportName = `synced_subtitles.${exportFormat}`;
     if (subtitleFileName) {
-      const baseName = subtitleFileName.replace(/\.(srt|vtt)$/i, '');
+      const baseName = subtitleFileName.replace(/\.(srt|vtt|xml|ttml)$/i, '');
       exportName = `${baseName}.${exportFormat}`;
     }
     
@@ -423,12 +434,13 @@ function App() {
             <div className="export-group">
               <select
                 value={exportFormat}
-                onChange={(e) => setExportFormat(e.target.value as 'srt' | 'vtt')}
+                onChange={(e) => setExportFormat(e.target.value as 'srt' | 'vtt' | 'ttml')}
                 className="select-format"
                 aria-label="Select export format"
               >
                 <option value="srt">SRT</option>
                 <option value="vtt">VTT</option>
+                <option value="ttml">TTML</option>
               </select>
               <button onClick={handleExport} className="btn btn-primary btn-sm" type="button">
                 <Download size={14} />
