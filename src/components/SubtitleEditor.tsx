@@ -81,7 +81,23 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
   
   // Helper functions for contentEditable rich text editing
   const subtitlesToHtml = (text: string): string => {
-    return text.replace(/\n/g, '<br>');
+    // Escape all HTML first so untrusted cue text (e.g. from an imported
+    // subtitle file) can't inject markup via the innerHTML assignment below,
+    // then re-enable only the b/i/u formatting tags we intentionally support.
+    let escaped = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    escaped = escaped
+      .replace(/&lt;b&gt;/gi, '<b>')
+      .replace(/&lt;\/b&gt;/gi, '</b>')
+      .replace(/&lt;i&gt;/gi, '<i>')
+      .replace(/&lt;\/i&gt;/gi, '</i>')
+      .replace(/&lt;u&gt;/gi, '<u>')
+      .replace(/&lt;\/u&gt;/gi, '</u>');
+
+    return escaped.replace(/\n/g, '<br>');
   };
 
   const htmlToSubtitles = (html: string): string => {
