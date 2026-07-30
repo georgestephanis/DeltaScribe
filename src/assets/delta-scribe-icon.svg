@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg-icon" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#0f0f1a"/>
+    </linearGradient>
+    <linearGradient id="wave-icon" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#6366F1" stop-opacity="0.5"/>
+      <stop offset="50%" stop-color="#6366F1" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#6366F1" stop-opacity="0.5"/>
+    </linearGradient>
+    <filter id="glow-icon" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Background rounded square -->
+  <rect width="64" height="64" rx="14" fill="url(#bg-icon)"/>
+
+  <!-- Subtitle bars — left side, representing text -->
+  <g transform="translate(8, 14)">
+    <rect x="0" y="0" width="18" height="4" rx="2" fill="#6366F1" opacity="0.35"/>
+    <rect x="3" y="8" width="14" height="4" rx="2" fill="#6366F1" opacity="0.25"/>
+    <rect x="1" y="16" width="16" height="4" rx="2" fill="#6366F1" opacity="0.18"/>
+    <rect x="4" y="24" width="12" height="4" rx="2" fill="#6366F1" opacity="0.12"/>
+  </g>
+
+  <!-- Sync waveform — center/right, representing audio sync -->
+  <g transform="translate(0, 0)" filter="url(#glow-icon)">
+    <path d="M 30 22 L 34 22 L 37 14 L 40 30 L 43 18 L 46 26 L 49 22 L 54 22 L 57 10 L 60 34 L 54 22 L 54 22" 
+          fill="none" stroke="#6366F1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Second wave offset -->
+    <path d="M 30 42 L 34 42 L 37 34 L 40 50 L 43 38 L 46 46 L 49 42 L 54 42 L 57 30 L 60 54 L 54 42" 
+          fill="none" stroke="#4F46E5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+  </g>
+
+  <!-- Sync alignment dots -->
+  <circle cx="24" cy="20" r="2.5" fill="#6366F1" opacity="0.8"/>
+  <circle cx="24" cy="40" r="2.5" fill="#6366F1" opacity="0.5"/>
+
+  <!-- Small play/cursor triangle at top -->
+  <polygon points="30,10 30,14 33,12" fill="#6366F1" opacity="0.7"/>
+</svg>

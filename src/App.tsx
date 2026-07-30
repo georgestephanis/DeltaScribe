@@ -4,9 +4,10 @@ import { MediaPanel } from './components/MediaPanel';
 import { SubtitleEditor } from './components/SubtitleEditor';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { parseSRT, formatSRT, formatVTT, formatTTML, type SubtitleCue } from './utils/subtitles';
-import { Download, Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
+import { Download, RefreshCw, AlertCircle } from 'lucide-react';
 import { AiAligner } from './components/AiAligner';
 import { __ } from './utils/i18n';
+import logoIcon from './assets/delta-scribe-icon.svg';
 
 function App() {
   // Loaded assets state
@@ -533,7 +534,7 @@ function App() {
       <header className="app-header">
         <div className="brand-section">
           <div className="app-logo">
-            <Sparkles size={24} />
+            <img src={logoIcon} className="app-logo-img" alt="DeltaScribe Logo" />
           </div>
           <h1>{__('DeltaScribe Studio')}</h1>
         </div>

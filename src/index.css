@@ -127,6 +127,12 @@ textarea::-webkit-scrollbar,
   box-shadow: 0 4px 15px var(--primary-glow);
 }
 
+.app-logo-img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
 .brand-section h1 {
   font-size: 28px;
   background: linear-gradient(to right, #FFFFFF, #9CA3AF);

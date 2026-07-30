@@ -1,5 +1,7 @@
 # DeltaScribe Studio
 
+![DeltaScribe Studio Banner](src/assets/delta-scribe-banner.svg)
+
 DeltaScribe is a sleek, premium, client-side subtitle and lyric timing synchronization studio built with React, Vite, and TypeScript. 
 
 It is designed to align subtitles and audio/video files completely in the browser—meaning **no media files or subtitles are ever uploaded to a server**, keeping your workflows private, secure, and fast.
