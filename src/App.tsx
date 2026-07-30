@@ -47,6 +47,17 @@ function App() {
   const [submitUrl, setSubmitUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Surface the actual destination host so users can see where the Submit
+  // button (populated from the ?submit= URL param) will send their data.
+  let submitHost = '';
+  if (submitUrl) {
+    try {
+      submitHost = new URL(submitUrl).host;
+    } catch {
+      submitHost = submitUrl;
+    }
+  }
+
   // Load remote files from query parameters on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -588,8 +599,11 @@ function App() {
                     className="btn btn-success btn-sm"
                     type="button"
                     disabled={isSubmitting}
+                    title={`Submits to: ${submitUrl}`}
                   >
-                    {isSubmitting ? __('Submitting...') : __('Submit')}
+                    {isSubmitting
+                      ? __('Submitting...')
+                      : `${__('Submit')} → ${submitHost}`}
                   </button>
                 )}
               </div>
