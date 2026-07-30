@@ -71,10 +71,15 @@ DeltaScribe can be integrated into external content management platforms as a lo
 *   `media`: The URL-encoded stream path to a video or audio file.
 *   `subtitles`: The URL-encoded path to a remote SRT, VTT, or TTML file.
 *   `submit`: The URL-encoded endpoint to POST the finished data back.
+*   `format` *(optional)*: One of `srt`, `vtt`, or `ttml`. When present, the export format is
+    locked to it and the format dropdown is disabled — use this when the `submit` endpoint only
+    knows how to handle a single format, rather than parsing all three.
+*   `lang` *(optional)*: A BCP-47 language code (e.g. `en`, `es`, `pt-BR`) used as the `xml:lang`
+    attribute on TTML export/submission. Defaults to `en`.
 
 **Example Link**:
 ```
-http://localhost:5173/?media=https%3A%2F%2Fexample.com%2Fvideo.mp4&subtitles=https%3A%2F%2Fexample.com%2Fsubs.srt&submit=https%3A%2F%2Fexample.com%2Fapi%2Fsave-subtitles
+http://localhost:5173/?media=https%3A%2F%2Fexample.com%2Fvideo.mp4&subtitles=https%3A%2F%2Fexample.com%2Fsubs.srt&submit=https%3A%2F%2Fexample.com%2Fapi%2Fsave-subtitles&format=ttml&lang=es
 ```
 
 When users click the green **Submit** button, DeltaScribe makes a `POST` request to the `submit` URL carrying the following JSON payload:
@@ -96,7 +101,11 @@ When users click the green **Submit** button, DeltaScribe makes a `POST` request
 }
 ```
 
-*Note: Remote media/subtitle files must be served with appropriate CORS headers (`Access-Control-Allow-Origin: *`) to enable browser fetching and audio visualization.*
+If the `submit` request fails, DeltaScribe will try to read a JSON `{ "message": "..." }` body
+from the (non-2xx) response and show that message to the user instead of a generic HTTP status,
+so receiving servers should return a descriptive `message` on error where possible.
+
+*Note: Remote media/subtitle files must be served with appropriate CORS headers (`Access-Control-Allow-Origin: *`) to enable browser fetching and audio visualization. Because the `submit` request is sent with `Content-Type: application/json`, browsers will first send a CORS preflight `OPTIONS` request to that endpoint — receiving servers must respond to `OPTIONS` with the appropriate `Access-Control-Allow-Origin`/`-Methods`/`-Headers` headers, not just the subsequent `POST`.*
 
 ---
 

@@ -48,6 +48,14 @@ function App() {
   const [submitUrl, setSubmitUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // When an embedding site provides a `?format=` param, the export format is
+  // locked to it (dropdown disabled) so the receiving `submit` endpoint can
+  // rely on a single, known format instead of handling all three.
+  const [lockedFormat, setLockedFormat] = useState<'srt' | 'vtt' | 'ttml' | null>(null);
+
+  // BCP-47 language code from `?lang=`, used for TTML's `xml:lang` on export/submit.
+  const [subtitleLang, setSubtitleLang] = useState('en');
+
   // Surface the actual destination host so users can see where the Submit
   // button (populated from the ?submit= URL param) will send their data.
   let submitHost = '';
@@ -65,9 +73,20 @@ function App() {
     const mediaParam = params.get('media');
     const subtitlesParam = params.get('subtitles');
     const submitParam = params.get('submit');
+    const formatParam = params.get('format');
+    const langParam = params.get('lang');
 
     if (submitParam) {
       setSubmitUrl(decodeURIComponent(submitParam));
+    }
+
+    if (formatParam === 'srt' || formatParam === 'vtt' || formatParam === 'ttml') {
+      setLockedFormat(formatParam);
+      setExportFormat(formatParam);
+    }
+
+    if (langParam) {
+      setSubtitleLang(decodeURIComponent(langParam));
     }
 
     if (mediaParam) {
@@ -439,7 +458,7 @@ function App() {
     if (exportFormat === 'vtt') {
       formatted = formatVTT(cues);
     } else if (exportFormat === 'ttml') {
-      formatted = formatTTML(cues);
+      formatted = formatTTML(cues, subtitleLang);
     } else {
       formatted = formatSRT(cues);
     }
@@ -472,7 +491,7 @@ function App() {
     if (exportFormat === 'vtt') {
       formatted = formatVTT(cues);
     } else if (exportFormat === 'ttml') {
-      formatted = formatTTML(cues);
+      formatted = formatTTML(cues, subtitleLang);
     } else {
       formatted = formatSRT(cues);
     }
@@ -497,8 +516,22 @@ function App() {
         }))
       })
     })
-    .then(res => {
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    .then(async res => {
+      if (!res.ok) {
+        // Receiving servers can return a JSON { message } body to explain
+        // what went wrong (e.g. wrong format, expired/invalid submit link);
+        // surface that instead of a bare HTTP status when present.
+        let detail = `HTTP ${res.status}`;
+        try {
+          const body = await res.json();
+          if (body && typeof body.message === 'string' && body.message) {
+            detail = body.message;
+          }
+        } catch {
+          // Response wasn't JSON — fall back to the HTTP status above.
+        }
+        throw new Error(detail);
+      }
       alert("Subtitles submitted successfully!");
     })
     .catch(err => {
@@ -585,6 +618,8 @@ function App() {
                   onChange={(e) => setExportFormat(e.target.value as 'srt' | 'vtt' | 'ttml')}
                   className="select-format"
                   aria-label="Select export format"
+                  disabled={!!lockedFormat}
+                  title={lockedFormat ? `Format locked to ${lockedFormat.toUpperCase()} by the embedding site` : undefined}
                 >
                   <option value="srt">SRT</option>
                   <option value="vtt">VTT</option>
