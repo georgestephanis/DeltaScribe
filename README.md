@@ -80,7 +80,17 @@ When users click the green **Submit** button, DeltaScribe makes a `POST` request
 {
   "fileName": "remote_subtitles.srt",
   "format": "srt",
-  "subtitles": "1\n00:00:01,000 --> 00:00:03,000\nHello World!"
+  "subtitles": "1\n00:00:01,000 --> 00:00:03,000\nHello World!",
+  "cues": [
+    {
+      "index": 1,
+      "startTime": 1.0,
+      "endTime": 3.0,
+      "text": "Hello World!",
+      "align": "center",
+      "line": "90%"
+    }
+  ]
 }
 ```
 

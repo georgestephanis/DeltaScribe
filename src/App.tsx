@@ -459,7 +459,15 @@ function App() {
       body: JSON.stringify({
         fileName: subtitleFileName || 'subtitles.srt',
         format: exportFormat,
-        subtitles: formatted
+        subtitles: formatted,
+        cues: cues.map(c => ({
+          index: c.index,
+          startTime: c.startTime,
+          endTime: c.endTime,
+          text: c.text,
+          align: c.align,
+          line: c.line
+        }))
       })
     })
     .then(res => {
