@@ -9,7 +9,7 @@ import { AiAligner } from './components/AiAligner';
 
 function App() {
   // Loaded assets state
-  const [mediaFile, setMediaFile] = useState<{ name: string; type: string; url: string } | null>(null);
+  const [mediaFile, setMediaFile] = useState<{ name: string; type: string; url: string; isRemote?: boolean } | null>(null);
   const [subtitleFileName, setSubtitleFileName] = useState<string | null>(null);
   const [cues, setCues] = useState<SubtitleCue[]>([]);
   
@@ -26,9 +26,52 @@ function App() {
   const [enableAlignment, setEnableAlignment] = useState(false);
   const [enableFormatting, setEnableFormatting] = useState(false);
 
-  // Reference subtitle track states
   const [referenceCues, setReferenceCues] = useState<SubtitleCue[]>([]);
   const [referenceFileName, setReferenceFileName] = useState<string | null>(null);
+  const [remoteLoadError, setRemoteLoadError] = useState<string | null>(null);
+  const [submitUrl, setSubmitUrl] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Load remote files from query parameters on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mediaParam = params.get('media');
+    const subtitlesParam = params.get('subtitles');
+    const submitParam = params.get('submit');
+
+    if (submitParam) {
+      setSubmitUrl(decodeURIComponent(submitParam));
+    }
+
+    if (mediaParam) {
+      const mediaUrl = decodeURIComponent(mediaParam);
+      const name = mediaUrl.split('/').pop() || 'Remote Media';
+      const type = name.endsWith('.mp3') || name.endsWith('.wav') || name.endsWith('.m4a') ? 'audio/mpeg' : 'video/mp4';
+      setMediaFile({
+        name,
+        type,
+        url: mediaUrl,
+        isRemote: true
+      });
+    }
+
+    if (subtitlesParam) {
+      const subUrl = decodeURIComponent(subtitlesParam);
+      fetch(subUrl)
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.text();
+        })
+        .then(text => {
+          const name = subUrl.split('/').pop() || 'remote_subtitles.srt';
+          handleSubtitlesLoaded(text, name);
+        })
+        .catch(err => {
+          console.error("Failed to load remote subtitles:", err);
+          setRemoteLoadError("Failed to fetch remote subtitles. Check your internet connection or CORS settings on the file host.");
+        });
+    }
+  }, []);
 
   // Compute reactive warning if chosen export format will strip layout settings
   const hasAlignOrLine = cues.some(c => c.align !== undefined || c.line !== undefined);
@@ -395,6 +438,43 @@ function App() {
     URL.revokeObjectURL(url);
   };
 
+  const handleSubmit = () => {
+    if (!submitUrl || cues.length === 0) return;
+
+    let formatted = '';
+    if (exportFormat === 'vtt') {
+      formatted = formatVTT(cues);
+    } else if (exportFormat === 'ttml') {
+      formatted = formatTTML(cues);
+    } else {
+      formatted = formatSRT(cues);
+    }
+
+    setIsSubmitting(true);
+    fetch(submitUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        fileName: subtitleFileName || 'subtitles.srt',
+        format: exportFormat,
+        subtitles: formatted
+      })
+    })
+    .then(res => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      alert("Subtitles submitted successfully!");
+    })
+    .catch(err => {
+      console.error("Failed to submit subtitles:", err);
+      alert(`Failed to submit subtitles: ${err.message}. Please check remote server availability and CORS permissions.`);
+    })
+    .finally(() => {
+      setIsSubmitting(false);
+    });
+  };
+
   // Keyboard Event Listeners for Syncing
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -478,6 +558,16 @@ function App() {
                   <Download size={14} />
                   Export
                 </button>
+                {submitUrl && (
+                  <button
+                    onClick={handleSubmit}
+                    className="btn btn-success btn-sm"
+                    type="button"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? "Submitting..." : "Submit"}
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -498,6 +588,7 @@ function App() {
               onReferenceSubtitlesLoaded={handleReferenceSubtitlesLoaded}
               onClearReference={handleClearReference}
               onCreateNewSubtitles={handleCreateNewSubtitles}
+              remoteLoadError={remoteLoadError}
             />
           </div>
         ) : (

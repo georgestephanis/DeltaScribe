@@ -12,6 +12,7 @@ interface FileDropZoneProps {
   onReferenceSubtitlesLoaded: (text: string, fileName: string) => void;
   onClearReference: () => void;
   onCreateNewSubtitles: () => void;
+  remoteLoadError?: string | null;
 }
 
 export const FileDropZone: React.FC<FileDropZoneProps> = ({
@@ -25,6 +26,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
   onReferenceSubtitlesLoaded,
   onClearReference,
   onCreateNewSubtitles,
+  remoteLoadError,
 }) => {
   const [isDragActive, setIsDragActive] = useState(false);
   const mediaInputRef = useRef<HTMLInputElement>(null);
@@ -105,6 +107,11 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
 
   return (
     <div className="workspace-importer">
+      {remoteLoadError && (
+        <div className="alert alert-danger" style={{ marginBottom: '16px' }}>
+          <span>{remoteLoadError}</span>
+        </div>
+      )}
       <div
         className={`dropzone ${isDragActive ? 'drag-active' : ''}`}
         onDragEnter={handleDrag}
@@ -250,6 +257,20 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
             )}
           </div>
         </div>
+      </div>
+
+      <div className="url-prepopulate-info">
+        <h4>🔗 Link Prepopulation Guide</h4>
+        <p>Pre-configure workspaces by passing source URLs as parameter coordinates in the address bar:</p>
+        <div className="url-example">
+          <code>{`${window.location.origin}/?media=https://example.com/video.mp4&subtitles=https://example.com/subs.vtt&submit=https://example.com/api/save`}</code>
+        </div>
+        <div className="parameter-descriptions">
+          <p>• <strong>media</strong>: URL path to an audio or video streaming source.</p>
+          <p>• <strong>subtitles</strong>: URL path to parsed SRT, WebVTT, or TTML captions.</p>
+          <p>• <strong>submit</strong>: Optional webhook URL. Adds a <em>Submit</em> button in the header actions tray.</p>
+        </div>
+        <p className="cors-note">* Note: Hosting endpoints must serve files with permissive CORS headers to allow browser fetching and canvas wave visualizers.</p>
       </div>
     </div>
   );

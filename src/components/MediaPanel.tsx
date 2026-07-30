@@ -3,7 +3,7 @@ import { Play, Pause, RotateCcw, SkipBack, SkipForward, Volume2, Activity, BarCh
 import type { SubtitleCue } from '../utils/subtitles';
 
 interface MediaPanelProps {
-  mediaFile: { name: string; type: string; url: string };
+  mediaFile: { name: string; type: string; url: string; isRemote?: boolean };
   currentTime: number;
   duration: number;
   isPlaying: boolean;
@@ -27,6 +27,7 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
 }) => {
   const isAudio = mediaFile.type.startsWith('audio/');
   const [visualizerMode, setVisualizerMode] = useState<'waveform' | 'spectrum' | 'spectrogram'>('waveform');
+  const [corsError, setCorsError] = useState(false);
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -56,6 +57,18 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
       sourceRef.current = source;
     } catch (e) {
       console.warn("Failed to connect MediaElementAudioSourceNode:", e);
+    }
+  };
+
+  const handlePlayerError = () => {
+    if (mediaFile.isRemote && !corsError) {
+      console.warn("CORS media load failed, retrying without anonymous credentials...");
+      setCorsError(true);
+      const player = playerRef.current;
+      if (player) {
+        player.removeAttribute('crossorigin');
+        player.load();
+      }
     }
   };
 
@@ -344,6 +357,8 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
             <audio
               ref={playerRef as React.RefObject<HTMLAudioElement>}
               src={mediaFile.url}
+              crossOrigin={mediaFile.isRemote && !corsError ? "anonymous" : undefined}
+              onError={handlePlayerError}
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={handleLoadedMetadata}
               onPlay={handlePlay}
@@ -383,7 +398,12 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
 
               <div className="canvas-container">
                 <canvas ref={canvasRef} className="audio-visualizer-canvas" />
-                {!analyserRef.current && (
+                {corsError && (
+                  <div className="cors-warning-overlay">
+                    <span>⚠️ Visualizer disabled (Remote host missing CORS headers)</span>
+                  </div>
+                )}
+                {!analyserRef.current && !corsError && (
                   <div className="audio-visualizer-fallback">
                     <Volume2 className={`audio-pulse-icon ${isPlaying ? 'pulse' : ''}`} size={42} />
                   </div>
@@ -406,6 +426,8 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
             <video
               ref={playerRef as React.RefObject<HTMLVideoElement>}
               src={mediaFile.url}
+              crossOrigin={mediaFile.isRemote && !corsError ? "anonymous" : undefined}
+              onError={handlePlayerError}
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={handleLoadedMetadata}
               onPlay={handlePlay}
