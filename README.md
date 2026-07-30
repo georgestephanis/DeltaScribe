@@ -85,3 +85,24 @@ When users click the green **Submit** button, DeltaScribe makes a `POST` request
 ```
 
 *Note: Remote media/subtitle files must be served with appropriate CORS headers (`Access-Control-Allow-Origin: *`) to enable browser fetching and audio visualization.*
+
+---
+
+## License
+
+DeltaScribe Studio is free and open-source software licensed under the **GNU GPLv2 or later (GPLv2+)**.
+
+### Dependency Licenses
+
+Our third-party dependencies are clustered below by license type:
+
+#### MIT License
+*   `react` (Core frontend framework library)
+*   `react-dom` (React document interface renderer)
+*   `lucide-react` (SVG icons package)
+*   `vite` & `@vitejs/plugin-react` (Application builder and bundler plugins)
+*   `oxlint` (Static analysis and code quality linter)
+*   `@types/react`, `@types/react-dom`, `@types/node` (TypeScript type declarations)
+
+#### Apache License 2.0
+*   `typescript` (Typed scripting language compiler engine)

@@ -666,7 +666,10 @@ function App() {
       </main>
 
       <footer className="app-footer">
-        <p>DeltaScribe Studio • Local Only & Secure • Built with React & Vite</p>
+        <p>
+          DeltaScribe Studio is free and open-source software under the GPLv2+ license. 
+          Contributions and details are available on <a href="https://github.com/georgestephanis/DeltaScribe" target="_blank" rel="noopener noreferrer">GitHub</a>.
+        </p>
       </footer>
     </>
   );
