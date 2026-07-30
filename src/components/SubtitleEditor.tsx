@@ -146,8 +146,36 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
       }
     };
 
+    // Wraps the current selection in a <b>/<i>/<u> element without relying on
+    // the deprecated document.execCommand API.
     const applyFormat = (command: 'bold' | 'italic' | 'underline') => {
-      document.execCommand(command, false);
+      const tagName = command === 'bold' ? 'b' : command === 'italic' ? 'i' : 'u';
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0 || selection.isCollapsed || !editorRef.current) {
+        return;
+      }
+
+      const range = selection.getRangeAt(0);
+      if (!editorRef.current.contains(range.commonAncestorContainer)) {
+        return;
+      }
+
+      const wrapper = document.createElement(tagName);
+      try {
+        range.surroundContents(wrapper);
+      } catch {
+        // Selection spans multiple sibling elements (surroundContents can't
+        // handle that); extract and re-wrap the fragment instead.
+        const contents = range.extractContents();
+        wrapper.appendChild(contents);
+        range.insertNode(wrapper);
+      }
+
+      selection.removeAllRanges();
+      const newRange = document.createRange();
+      newRange.selectNodeContents(wrapper);
+      selection.addRange(newRange);
+
       handleInput();
     };
 
