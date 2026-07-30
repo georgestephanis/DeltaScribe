@@ -3,8 +3,10 @@ import { parseTimestamp } from './common';
 
 /**
  * Parses a TTML time duration/offset/clock value into seconds.
+ * `frameRate` is the document's ttp:frameRate (defaults to 24fps if the
+ * document doesn't specify one), used to convert frame-based offsets.
  */
-function parseTTMLTime(timeStr: string): number {
+function parseTTMLTime(timeStr: string, frameRate: number = 24): number {
   const trimmed = timeStr.trim();
   if (trimmed.includes(':')) {
     const parts = trimmed.split(':');
@@ -14,8 +16,7 @@ function parseTTMLTime(timeStr: string): number {
       const minutes = parseInt(parts[1], 10) || 0;
       const seconds = parseInt(parts[2], 10) || 0;
       const frames = parseInt(parts[3], 10) || 0;
-      // Default to 24fps frame rate
-      return hours * 3600 + minutes * 60 + seconds + frames / 24;
+      return hours * 3600 + minutes * 60 + seconds + frames / frameRate;
     }
     return parseTimestamp(trimmed);
   }
@@ -26,13 +27,13 @@ function parseTTMLTime(timeStr: string): number {
     const value = parseFloat(match[1]);
     const unit = match[2];
     if (isNaN(value)) return 0;
-    
+
     switch (unit) {
       case 'ms': return value / 1000;
       case 's': return value;
       case 'm': return value * 60;
       case 'h': return value * 3600;
-      case 'f': return value / 24; // Default to 24fps
+      case 'f': return value / frameRate;
       default: return value;
     }
   }
@@ -124,6 +125,11 @@ export function parseTTML(xmlText: string): SubtitleCue[] {
     console.error("DOMParser parsed error:", parserError[0].textContent);
   }
 
+  const ttRoot = doc.getElementsByTagName('tt')[0];
+  const frameRateAttr = ttRoot?.getAttribute('ttp:frameRate') || ttRoot?.getAttribute('frameRate');
+  const parsedFrameRate = frameRateAttr ? parseFloat(frameRateAttr) : NaN;
+  const frameRate = !isNaN(parsedFrameRate) && parsedFrameRate > 0 ? parsedFrameRate : 24;
+
   let index = 1;
   for (let i = 0; i < ps.length; i++) {
     const p = ps[i];
@@ -131,8 +137,8 @@ export function parseTTML(xmlText: string): SubtitleCue[] {
     const endAttr = p.getAttribute('end');
     if (!beginAttr || !endAttr) continue;
 
-    const startTime = parseTTMLTime(beginAttr);
-    const endTime = parseTTMLTime(endAttr);
+    const startTime = parseTTMLTime(beginAttr, frameRate);
+    const endTime = parseTTMLTime(endAttr, frameRate);
     
     let text = '';
     for (let j = 0; j < p.childNodes.length; j++) {
