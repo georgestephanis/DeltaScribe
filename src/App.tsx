@@ -23,6 +23,8 @@ function App() {
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isTextEditable, setIsTextEditable] = useState(true);
   const [exportFormat, setExportFormat] = useState<'srt' | 'vtt' | 'ttml'>('srt');
+  const [enableAlignment, setEnableAlignment] = useState(false);
+  const [enableFormatting, setEnableFormatting] = useState(false);
 
   // Reference subtitle track states
   const [referenceCues, setReferenceCues] = useState<SubtitleCue[]>([]);
@@ -100,6 +102,16 @@ function App() {
       setExportFormat('ttml');
     } else {
       setExportFormat('srt');
+    }
+
+    // Auto-enable layout settings if cues contain formatting or alignment parameters
+    const hasAlignOrLine = parsed.some(c => c.align !== undefined || c.line !== undefined);
+    const hasFormatting = parsed.some(c => /<\/?(i|b|u)\b[^>]*>/i.test(c.text));
+    if (hasAlignOrLine) {
+      setEnableAlignment(true);
+    }
+    if (hasFormatting) {
+      setEnableFormatting(true);
     }
 
     if (parsed.length > 0) {
@@ -552,6 +564,10 @@ function App() {
                 onSeek={handleSeek}
                 onFocusInput={setIsInputFocused}
                 onCopyReferenceTiming={handleCopyReferenceTiming}
+                enableAlignment={enableAlignment}
+                setEnableAlignment={setEnableAlignment}
+                enableFormatting={enableFormatting}
+                setEnableFormatting={setEnableFormatting}
               />
             </div>
           </>

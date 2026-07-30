@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Plus, Trash2, Search, FastForward, SlidersHorizontal, Lock, Unlock, Scissors, RotateCcw, Copy, Settings, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
+import { Plus, Trash2, Search, FastForward, SlidersHorizontal, Lock, Unlock, Scissors, RotateCcw, Copy, Settings, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline } from 'lucide-react';
 import type { SubtitleCue } from '../utils/subtitles';
 
 interface SubtitleEditorProps {
@@ -18,6 +18,10 @@ interface SubtitleEditorProps {
   onSeek: (time: number) => void;
   onFocusInput: (isFocused: boolean) => void;
   onCopyReferenceTiming: (cueId: string, startTime: number, endTime: number) => void;
+  enableAlignment: boolean;
+  setEnableAlignment: (val: boolean) => void;
+  enableFormatting: boolean;
+  setEnableFormatting: (val: boolean) => void;
 }
 
 interface AutoExpandingTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -65,11 +69,129 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
   onSeek,
   onFocusInput,
   onCopyReferenceTiming,
+  enableAlignment,
+  setEnableAlignment,
+  enableFormatting,
+  setEnableFormatting,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [shiftAmount, setShiftAmount] = useState('1.0');
   const [showShiftControls, setShowShiftControls] = useState(false);
   const listContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Helper functions for contentEditable rich text editing
+  const subtitlesToHtml = (text: string): string => {
+    return text.replace(/\n/g, '<br>');
+  };
+
+  const htmlToSubtitles = (html: string): string => {
+    let text = html
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/div>\s*<div>/gi, '\n')
+      .replace(/<div>/gi, '')
+      .replace(/<\/div>/gi, '')
+      .replace(/<p>/gi, '')
+      .replace(/<\/p>/gi, '\n')
+      .replace(/<strong>/gi, '<b>')
+      .replace(/<\/strong>/gi, '</b>')
+      .replace(/<em>/gi, '<i>')
+      .replace(/<\/em>/gi, '</i>');
+
+    // Strip all HTML tags except our custom formatting tags b, i, u
+    text = text.replace(/<(?!(\/?(b|i|u)))\b[^>]*>/gi, '');
+
+    // Unescape HTML entities natively
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(text, 'text/html');
+    return doc.body.textContent || text;
+  };
+
+  // Reusable inline contentEditable text editor component
+  const RichTextEditor: React.FC<{
+    value: string;
+    onChange: (val: string) => void;
+    onFocus: () => void;
+    onBlur: () => void;
+    disabled: boolean;
+  }> = ({ value, onChange, onFocus, onBlur, disabled }) => {
+    const editorRef = useRef<HTMLDivElement>(null);
+    const [isFocused, setIsFocused] = useState(false);
+
+    useEffect(() => {
+      if (editorRef.current && !isFocused) {
+        editorRef.current.innerHTML = subtitlesToHtml(value);
+      }
+    }, [value, isFocused]);
+
+    const handleInput = () => {
+      if (editorRef.current) {
+        const cleaned = htmlToSubtitles(editorRef.current.innerHTML);
+        onChange(cleaned);
+      }
+    };
+
+    const applyFormat = (command: 'bold' | 'italic' | 'underline') => {
+      document.execCommand(command, false);
+      handleInput();
+    };
+
+    return (
+      <div className="rich-editor-wrapper">
+        {isFocused && !disabled && (
+          <div className="rich-editor-toolbar animate-slide-down">
+            <button
+              onMouseDown={(e) => {
+                e.preventDefault();
+                applyFormat('bold');
+              }}
+              className="toolbar-btn"
+              title="Bold Selection"
+              type="button"
+            >
+              <Bold size={12} />
+            </button>
+            <button
+              onMouseDown={(e) => {
+                e.preventDefault();
+                applyFormat('italic');
+              }}
+              className="toolbar-btn"
+              title="Italic Selection"
+              type="button"
+            >
+              <Italic size={12} />
+            </button>
+            <button
+              onMouseDown={(e) => {
+                e.preventDefault();
+                applyFormat('underline');
+              }}
+              className="toolbar-btn"
+              title="Underline Selection"
+              type="button"
+            >
+              <Underline size={12} />
+            </button>
+          </div>
+        )}
+        <div
+          ref={editorRef}
+          contentEditable={!disabled}
+          onFocus={() => {
+            setIsFocused(true);
+            onFocus();
+          }}
+          onBlur={() => {
+            setIsFocused(false);
+            onBlur();
+          }}
+          onInput={handleInput}
+          className="rich-editor-content"
+          placeholder="Enter subtitle text..."
+        />
+      </div>
+    );
+  };
   
   // Local state to track offset input values while typing
   const [offsetInputs, setOffsetInputs] = useState<Record<string, { startTime?: string; endTime?: string }>>({});
@@ -182,6 +304,26 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
           >
             {isTextEditable ? <Unlock size={16} /> : <Lock size={16} />}
             {isTextEditable ? "Text Editable" : "Text Locked"}
+          </button>
+
+          {/* Alignment toggle flag settings */}
+          <button
+            onClick={() => setEnableAlignment(!enableAlignment)}
+            className={`btn btn-sm ${enableAlignment ? 'btn-primary active' : 'btn-secondary'}`}
+            title="Toggle subtitle layout alignment & position coordinates"
+            type="button"
+          >
+            Alignments
+          </button>
+
+          {/* Formatting toggle flag settings */}
+          <button
+            onClick={() => setEnableFormatting(!enableFormatting)}
+            className={`btn btn-sm ${enableFormatting ? 'btn-primary active' : 'btn-secondary'}`}
+            title="Toggle rich text bold/italic style formatting"
+            type="button"
+          >
+            Rich Text
           </button>
 
           {/* Add a general button */}
@@ -420,17 +562,19 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
                     >
                       <FastForward size={14} />
                     </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenSettingsCueId(openSettingsCueId === cue.id ? null : cue.id);
-                      }}
-                      className={`btn-icon-only-sm ${openSettingsCueId === cue.id ? 'active' : ''}`}
-                      title="Adjust alignment and line placement"
-                      type="button"
-                    >
-                      <Settings size={14} />
-                    </button>
+                    {enableAlignment && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenSettingsCueId(openSettingsCueId === cue.id ? null : cue.id);
+                        }}
+                        className={`btn-icon-only-sm ${openSettingsCueId === cue.id ? 'active' : ''}`}
+                        title="Adjust alignment and line placement"
+                        type="button"
+                      >
+                        <Settings size={14} />
+                      </button>
+                    )}
                     <button
                       onClick={(e) => { e.stopPropagation(); onSplitCue(cue.id); }}
                       className="btn-icon-only-sm"
@@ -522,20 +666,35 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
                 )}
 
                 <div className="cue-body">
-                  <AutoExpandingTextarea
-                    value={cue.text}
-                    onChange={(e) => onChangeCue(cue.id, { text: e.target.value })}
-                    placeholder={isTextEditable ? "Enter subtitle text..." : "Text is locked (read-only)"}
-                    className="cue-text-area"
-                    readOnly={!isTextEditable}
-                    onFocus={() => {
-                      onSelectCue(cue.id);
-                      if (isTextEditable) {
-                        onFocusInput(true);
-                      }
-                    }}
-                    onBlur={() => onFocusInput(false)}
-                  />
+                  {enableFormatting ? (
+                    <RichTextEditor
+                      value={cue.text}
+                      onChange={(text) => onChangeCue(cue.id, { text })}
+                      onFocus={() => {
+                        onSelectCue(cue.id);
+                        if (isTextEditable) {
+                          onFocusInput(true);
+                        }
+                      }}
+                      onBlur={() => onFocusInput(false)}
+                      disabled={!isTextEditable}
+                    />
+                  ) : (
+                    <AutoExpandingTextarea
+                      value={cue.text}
+                      onChange={(e) => onChangeCue(cue.id, { text: e.target.value })}
+                      placeholder={isTextEditable ? "Enter subtitle text..." : "Text is locked (read-only)"}
+                      className="cue-text-area"
+                      readOnly={!isTextEditable}
+                      onFocus={() => {
+                        onSelectCue(cue.id);
+                        if (isTextEditable) {
+                          onFocusInput(true);
+                        }
+                      }}
+                      onBlur={() => onFocusInput(false)}
+                    />
+                  )}
                   {(() => {
                     const refCue = referenceCues.find(rc => rc.index === cue.index);
                     if (refCue) {

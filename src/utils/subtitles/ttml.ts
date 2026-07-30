@@ -41,6 +41,76 @@ function parseTTMLTime(timeStr: string): number {
 }
 
 /**
+ * Recursively parses a TTML DOM node to construct subtitle text containing inline HTML-like styling tags (<i>, <b>, <u>).
+ */
+function parseTTMLNode(node: Node): string {
+  if (node.nodeType === 3) {
+    return node.textContent || '';
+  }
+
+  if (node.nodeType === 1) {
+    const el = node as Element;
+    const tagName = el.tagName.toLowerCase();
+
+    if (tagName === 'br') {
+      return '\n';
+    }
+
+    let innerText = '';
+    for (let i = 0; i < el.childNodes.length; i++) {
+      innerText += parseTTMLNode(el.childNodes[i]);
+    }
+
+    if (tagName === 'span') {
+      const fontStyle = el.getAttribute('tts:fontStyle') || el.getAttribute('fontStyle');
+      const fontWeight = el.getAttribute('tts:fontWeight') || el.getAttribute('fontWeight');
+      const textDeco = el.getAttribute('tts:textDecoration') || el.getAttribute('textDecoration');
+
+      if (fontStyle === 'italic') {
+        innerText = `<i>${innerText}</i>`;
+      }
+      if (fontWeight === 'bold') {
+        innerText = `<b>${innerText}</b>`;
+      }
+      if (textDeco === 'underline') {
+        innerText = `<u>${innerText}</u>`;
+      }
+    }
+
+    return innerText;
+  }
+
+  return '';
+}
+
+/**
+ * Translates subtitle cue text containing standard formatting tags (<i>, <b>, <u>)
+ * into W3C TTML compliant <span> nodes.
+ */
+function subtitleToTTMLXML(text: string): string {
+  let escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+
+  // Translate back linebreaks
+  escaped = escaped.replace(/\n/g, '<br />');
+
+  // Convert basic tags recursively
+  escaped = escaped
+    .replace(/&lt;i&gt;/g, '<span tts:fontStyle="italic">')
+    .replace(/&lt;\/i&gt;/g, '</span>')
+    .replace(/&lt;b&gt;/g, '<span tts:fontWeight="bold">')
+    .replace(/&lt;\/b&gt;/g, '</span>')
+    .replace(/&lt;u&gt;/g, '<span tts:textDecoration="underline">')
+    .replace(/&lt;\/u&gt;/g, '</span>');
+
+  return escaped;
+}
+
+/**
  * Parses raw TTML XML string content into an array of SubtitleCues.
  */
 export function parseTTML(xmlText: string): SubtitleCue[] {
@@ -63,7 +133,11 @@ export function parseTTML(xmlText: string): SubtitleCue[] {
 
     const startTime = parseTTMLTime(beginAttr);
     const endTime = parseTTMLTime(endAttr);
-    const text = p.textContent || '';
+    
+    let text = '';
+    for (let j = 0; j < p.childNodes.length; j++) {
+      text += parseTTMLNode(p.childNodes[j]);
+    }
 
     const alignAttr = p.getAttribute('tts:textAlign') || p.getAttribute('textAlign');
     let align: 'left' | 'center' | 'right' | undefined;
@@ -110,13 +184,7 @@ export function formatTTML(cues: SubtitleCue[]): string {
   };
 
   const bodyParagraphs = sortedCues.map(cue => {
-    const escapedText = cue.text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;');
-    
+    const escapedText = subtitleToTTMLXML(cue.text);
     const alignAttr = cue.align ? ` tts:textAlign="${cue.align}"` : '';
     
     return `      <p begin="${formatTTMLTimestamp(cue.startTime)}" end="${formatTTMLTimestamp(cue.endTime)}"${alignAttr}>${escapedText}</p>`;
