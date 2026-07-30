@@ -170,8 +170,10 @@ export function parseTTML(xmlText: string): SubtitleCue[] {
 
 /**
  * Formats a list of SubtitleCues back to standard TTML XML format.
+ *
+ * @param lang BCP-47 language code for the `xml:lang` attribute. Defaults to `"en"`.
  */
-export function formatTTML(cues: SubtitleCue[]): string {
+export function formatTTML(cues: SubtitleCue[], lang: string = 'en'): string {
   const sortedCues = [...cues].sort((a, b) => a.startTime - b.startTime);
 
   const formatTTMLTimestamp = (seconds: number): string => {
@@ -197,8 +199,10 @@ export function formatTTML(cues: SubtitleCue[]): string {
     return `      <p begin="${formatTTMLTimestamp(cue.startTime)}" end="${formatTTMLTimestamp(cue.endTime)}"${alignAttr}>${escapedText}</p>`;
   }).join('\n');
 
+  const escapedLang = lang.replace(/[^A-Za-z0-9-]/g, '') || 'en';
+
   return `<?xml version="1.0" encoding="utf-8"?>
-<tt xmlns="http://www.w3.org/ns/ttml" xml:lang="en">
+<tt xmlns="http://www.w3.org/ns/ttml" xml:lang="${escapedLang}">
   <head>
     <styling>
       <style xml:id="default" tts:fontFamily="sansSerif" tts:fontSize="16px" tts:textAlign="center" xmlns:tts="http://www.w3.org/ns/ttml#styling" />
