@@ -1,5 +1,6 @@
 import type { SubtitleCue } from './types';
 import { parseTimestamp } from './common';
+import { generateId } from '../id';
 
 /**
  * Parses a TTML time duration/offset/clock value into seconds.
@@ -152,7 +153,7 @@ export function parseTTML(xmlText: string): SubtitleCue[] {
     }
 
     cues.push({
-      id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
+      id: generateId(),
       index,
       startTime,
       endTime,

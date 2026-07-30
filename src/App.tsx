@@ -8,6 +8,7 @@ import { Download, RefreshCw, AlertCircle } from 'lucide-react';
 import { AiAligner } from './components/AiAligner';
 import { __ } from './utils/i18n';
 import logoIcon from './assets/delta-scribe-icon.svg';
+import { generateId } from './utils/id';
 
 function App() {
   // Loaded assets state
@@ -161,7 +162,7 @@ function App() {
 
   const handleSubtitlesLoaded = (text: string, fileName: string) => {
     const parsed = parseSRT(text);
-    const newTrackId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9);
+    const newTrackId = generateId();
     const newTrack = { id: newTrackId, name: fileName, cues: parsed };
     setSubtitleTracks(prev => [...prev, newTrack]);
     setActiveTrackId(prev => prev || newTrackId);
@@ -195,8 +196,8 @@ function App() {
   };
 
   const handleCreateNewSubtitles = () => {
-    const newTrackId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9);
-    const initialCueId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9);
+    const newTrackId = generateId();
+    const initialCueId = generateId();
     const initialCue: SubtitleCue = {
       id: initialCueId,
       index: 1,
@@ -213,7 +214,7 @@ function App() {
 
   // Cue mutation actions
   const handleAddCue = useCallback((insertAfterId?: string) => {
-    const newId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9);
+    const newId = generateId();
     
     setActiveCues((prevCues) => {
       let newCueStart = playerRef.current?.currentTime || 0;
@@ -353,7 +354,7 @@ function App() {
         }
       }
 
-      const secondId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9);
+      const secondId = generateId();
 
       const firstCue: SubtitleCue = {
         ...cue,
@@ -659,7 +660,7 @@ function App() {
                   onUpdateCueTimings={handleUpdateMultipleCueTimings}
                   onSaveCurrentAsReference={() => {
                     if (activeTrack) {
-                      const newTrackId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9);
+                      const newTrackId = generateId();
                       const newTrack = {
                         id: newTrackId,
                         name: `original_${activeTrack.name}`,

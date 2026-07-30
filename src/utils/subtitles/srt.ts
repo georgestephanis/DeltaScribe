@@ -1,5 +1,6 @@
 import type { SubtitleCue } from './types';
 import { parseTimestamp, formatTimestamp } from './common';
+import { generateId } from '../id';
 
 /**
  * Parses raw subtitle content in SRT format into an array of SubtitleCues.
@@ -71,7 +72,7 @@ export function parseSRT(text: string): SubtitleCue[] {
     }
 
     cues.push({
-      id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
+      id: generateId(),
       index,
       startTime,
       endTime,
