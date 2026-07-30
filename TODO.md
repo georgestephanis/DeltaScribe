@@ -69,30 +69,50 @@ Render real-time visual waveforms, frequency spectrum bars, and a spectroscopic 
 
 ---
 
-## [/] Feature 5: Leverage Chrome's Built-in AI & Web APIs
+## [x] Feature 5: Leverage Chrome's Built-in AI & Web APIs
 Integrate Chrome's built-in AI models (Gemini Nano) and Web Speech APIs to perform speech-to-text timing generation, local translation, and timing quality assurance completely client-side.
 
-### [x] A. Local Language Translation (Chrome Prompt API / Gemini Nano)
-*   **Concept**: Translate subtitles locally using the browser's built-in Gemini Nano model (`ai.languageModel`).
-*   **Implementation**:
-    1. Backup active subtitle cues to the reference track.
-    2. Instantiate a local model session: `const session = await window.ai.languageModel.create()`.
-    3. Loop through active cues, translating their text in-place while retaining all start/end timings and anchor values.
+### [x] A. Local Language Translation (Chrome Prompt API / Gemini Nano & OpenAI Endpoints)
+*   **Concept**: Translate subtitles locally using the browser's built-in Gemini Nano model or third-party compatible APIs.
+*   **Implementation**: Fully supports built-in Chrome models and custom OpenAI-compatible server APIs.
 
 ### [ ] B. Subtitle Quality Check & Context Analysis (Chrome Prompt API / Gemini Nano)
-*   **Concept**: Analyze subtitle text using Chrome's built-in Gemini Nano model (`ai.languageModel`) to run semantic checks (e.g. check for alignment errors, line splitting recommendations, grammatical formatting, or context checks).
-*   **Implementation**:
-    1. Initialize the session: `const session = await window.ai.languageModel.create()`.
-    2. Prompt the local model to analyze subtitle line breaks or check translation semantic alignment between reference and target subtitle text.
+*   **Concept**: Analyze subtitle text using Chrome's built-in Gemini Nano model to run semantic checks.
+*   **Implementation Strategy**: Prompt local sessions to analyze line breaks or translations.
 
 ### [x] C. Voice-to-Text Speech Recognition (Web Speech API)
 *   **Concept**: Recognize speech from the media playback to auto-generate timing blocks or highlight spoken segments.
-*   **Implementation**:
-    1. Use the browser's native `SpeechRecognition` API (`webkitSpeechRecognition`).
-    2. Capture real-time text and timestamps to bootstrap a blank subtitle timeline or check manual timing precision automatically.
+*   **Implementation**: Hooks the browser's native `SpeechRecognition` API.
 
 ### [x] D. Chrome Gemini Nano AI Alignment
 *   **Concept**: Align original subtitle text with the recognized speech transcripts based on semantic meaning using Chrome's local AI model (`window.ai.languageModel`).
-*   **Implementation**:
-    1. Create a prompt containing the original subtitles and the transcriptions with recorded timestamps.
-    2. Prompt the local model to map subtitle IDs to start/end times and update timings client-side.
+*   **Implementation**: Map IDs to voice coordinates and auto-adjust timing parameters in-place.
+
+---
+
+## [x] Feature 6: OpenAI-Compatible API Settings
+Support connecting to custom, local, or third-party OpenAI-compatible completion endpoints (like Ollama, llama.cpp, vLLM, and the like) to handle translations and bulk prompts.
+
+### Implementation Strategy
+1. **Providers Selection UI**: Add configuration selectors under Settings swapping between Chrome Nano and OpenAI.
+2. **Endpoint Mappings**: Route completions to `/v1/chat/completions` using stateless HTTP requests.
+
+---
+
+## [x] Feature 7: Gated Text Alignment & Rich Text Visual Styling
+Allow subtitle sync designers to visually format text styling (Bold, Italic, Underline) and position alignments (Left, Center, Right) or vertical lines (Top, Middle, Bottom).
+
+### Implementation Strategy
+1. **Gated Configuration Toolbar**: Add header switches to toggle "Alignments" and "Rich Text" widgets.
+2. **Visual Editor Integration**: Swaps standard text inputs for contenteditable rich-text editors when formatting is active.
+3. **Timed Text Spans**: Recursive DOM parsers map XML spans inside TTML formats to raw HTML tags and vice versa.
+
+---
+
+## [x] Feature 8: Workspace URL Prepopulation & Webhook Callback Submissions
+Load remote video/audio feeds and subtitles directly on page load via GET query string parameters, and allow editing workspaces to submit finished files back to third-party endpoints.
+
+### Implementation Strategy
+1. **Query Routing**: Load files dynamically if `media` or `subtitles` are defined in the address bar.
+2. **Self-Healing CORS**: Try fetching remote assets with CORS credentials; on block, automatically fallback to direct streams and disable visualizers safely.
+3. **Webhook Submissions**: Render a "Submit" button if a `submit` URL is present to POST subtitle JSON payloads.
