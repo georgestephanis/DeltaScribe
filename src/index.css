@@ -2092,3 +2092,321 @@ textarea::-webkit-scrollbar,
   font-size: 11px;
   color: var(--text-muted);
 }
+
+/* Subtitle Timing Scaling Mode Styles */
+
+.scaling-helper-panel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(99, 102, 241, 0.04);
+  border-bottom: 1px solid var(--border-color);
+  padding: 10px 16px;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-radius: 4px;
+}
+
+.scaling-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
+.btn-anchor-toggle {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  border-radius: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.btn-anchor-toggle:hover {
+  border-color: var(--border-color-hover);
+  color: var(--text-main);
+}
+
+.btn-anchor-toggle.active {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.45);
+  color: #fbbf24;
+}
+
+.btn-anchor-toggle.active:hover {
+  border-color: #f59e0b;
+}
+
+/* Manual Anchor Card Styling */
+.cue-card.manual-anchor {
+  border-color: rgba(245, 158, 11, 0.45) !important;
+  background: rgba(245, 158, 11, 0.03) !important;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.05);
+}
+
+.cue-card.manual-anchor:hover {
+  border-color: rgba(245, 158, 11, 0.65) !important;
+  background: rgba(245, 158, 11, 0.05) !important;
+}
+
+.cue-card.manual-anchor.selected {
+  border-color: #f59e0b !important;
+  background: rgba(245, 158, 11, 0.08) !important;
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.15);
+}
+
+/* Auto-Adjusted Card Styling */
+.cue-card.auto-adjusted {
+  border-color: rgba(56, 189, 248, 0.35) !important;
+  background: rgba(56, 189, 248, 0.02) !important;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.03);
+}
+
+.cue-card.auto-adjusted:hover {
+  border-color: rgba(56, 189, 248, 0.55) !important;
+  background: rgba(56, 189, 248, 0.04) !important;
+}
+
+.cue-card.auto-adjusted.selected {
+  border-color: #38bdf8 !important;
+  background: rgba(56, 189, 248, 0.08) !important;
+  box-shadow: 0 0 15px rgba(56, 189, 248, 0.12);
+}
+
+/* Badge colors */
+.badge.badge-anchor {
+  background: rgba(245, 158, 11, 0.15) !important;
+  color: #fbbf24 !important;
+  border: 1px solid rgba(245, 158, 11, 0.4) !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.badge.badge-auto {
+  background: rgba(56, 189, 248, 0.12) !important;
+  color: #38bdf8 !important;
+  border: 1px solid rgba(56, 189, 248, 0.3) !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Offset Badge container states */
+.offset-badge-container.manual-anchor-offset {
+  border-left-color: rgba(245, 158, 11, 0.3) !important;
+  border-right-color: rgba(245, 158, 11, 0.3) !important;
+  background: rgba(245, 158, 11, 0.05) !important;
+}
+
+.offset-badge-container.manual-anchor-offset .offset-symbol {
+  color: #fbbf24 !important;
+}
+
+.offset-badge-container.auto-adjusted-offset {
+  border-left-color: rgba(56, 189, 248, 0.3) !important;
+  border-right-color: rgba(56, 189, 248, 0.3) !important;
+  background: rgba(56, 189, 248, 0.05) !important;
+}
+
+.offset-badge-container.auto-adjusted-offset .offset-symbol {
+  color: #38bdf8 !important;
+}
+
+/* Subtitle Duration Adjustments & Overlap Warnings */
+
+.end-adjust-group {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: 6px;
+  align-items: center;
+}
+
+.btn-adjust {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-adjust:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--border-color-hover);
+  color: var(--text-main);
+}
+
+.btn-adjust-stretch {
+  background: rgba(99, 102, 241, 0.08) !important;
+  border-color: rgba(99, 102, 241, 0.25) !important;
+  color: #a5b4fc !important;
+}
+
+.btn-adjust-stretch:hover {
+  background: rgba(99, 102, 241, 0.15) !important;
+  border-color: rgba(99, 102, 241, 0.4) !important;
+  color: #c7d2fe !important;
+}
+
+/* Overlap Warning */
+.overlap-warning-text {
+  font-size: 9px;
+  font-weight: 600;
+  color: #EF4444;
+  margin-left: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.time-field.overlap-warning-border {
+  border-color: rgba(239, 68, 68, 0.45) !important;
+  box-shadow: 0 0 5px rgba(239, 68, 68, 0.15) !important;
+}
+
+/* AI Quality Inspector Styles */
+.quality-actions-panel {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.last-checked-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 10px;
+}
+
+.quality-issues-box {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 12px;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.quality-clear-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--success);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px;
+}
+
+.issues-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.issue-item {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-size: 12px;
+}
+
+.issue-item.warning {
+  background: rgba(239, 68, 68, 0.03);
+  border-color: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+}
+
+.issue-item.info {
+  background: rgba(99, 102, 241, 0.03);
+  border-color: rgba(99, 102, 241, 0.15);
+  color: #c7d2fe;
+}
+
+.issue-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.issue-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.issue-text {
+  line-height: 1.4;
+}
+
+.btn-jump-cue {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--primary);
+  font-size: 10px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  width: fit-content;
+  transition: color 0.2s;
+}
+
+.btn-jump-cue:hover {
+  color: #818cf8;
+  text-decoration: underline;
+}
+
+/* Card Play/Seek Button */
+.btn-card-play-seek {
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+}
+
+.btn-card-play-seek:hover {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #c7d2fe;
+}

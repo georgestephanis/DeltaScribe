@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Brain, Sparkles, Cpu, AlertTriangle, Check, RefreshCw, Settings } from 'lucide-react';
+import { Mic, MicOff, Brain, Sparkles, Cpu, AlertTriangle, Check, RefreshCw, Settings, ShieldAlert, ClipboardCheck } from 'lucide-react';
 import type { SubtitleCue } from '../utils/subtitles';
 
 interface AiSettings {
@@ -17,6 +17,7 @@ interface AiAlignerProps {
   onUpdateAllCues: (updatedCues: SubtitleCue[]) => void;
   aiSettings: AiSettings;
   onUpdateAiSettings: (newSettings: AiSettings) => void;
+  onSeek?: (time: number) => void;
 }
 
 export const AiAligner: React.FC<AiAlignerProps> = ({
@@ -27,6 +28,7 @@ export const AiAligner: React.FC<AiAlignerProps> = ({
   onUpdateAllCues,
   aiSettings,
   onUpdateAiSettings,
+  onSeek,
 }) => {
   const [isListening, setIsListening] = useState(false);
   const [capturedTranscripts, setCapturedTranscripts] = useState<{ time: number; text: string }[]>([]);
@@ -42,6 +44,11 @@ export const AiAligner: React.FC<AiAlignerProps> = ({
   const [targetLang, setTargetLang] = useState('Spanish');
   const [isTranslating, setIsTranslating] = useState(false);
   const [translateProgress, setTranslateProgress] = useState(0);
+
+  // Quality Check states
+  const [isChecking, setIsChecking] = useState(false);
+  const [qualityIssues, setQualityIssues] = useState<{ index: number; type: 'warning' | 'info'; message: string }[]>([]);
+  const [checkedAt, setCheckedAt] = useState<string | null>(null);
 
   const SUPPORTED_LANGUAGES = [
     'Spanish',
@@ -392,6 +399,89 @@ ${cue.text}`;
     }
   };
 
+  const runQualityCheck = async () => {
+    setIsChecking(true);
+    setAlignError(null);
+    setQualityIssues([]);
+    setIsSuccess(false);
+
+    try {
+      if (cues.length === 0) {
+        throw new Error("No subtitle cues loaded.");
+      }
+
+      const systemPrompt = `You are a professional subtitle quality checking assistant.
+Analyze the provided subtitle cues and return a list of quality warnings or context recommendations.
+Check for:
+1. Lines that are too long (more than 47 characters in a single line).
+2. Captions with high reading speed (reading rate > 5 words per second).
+3. Grammar, spelling, or punctuation issues.
+4. Suggestions for better line breaks or context improvements.
+
+Return ONLY a valid JSON array of objects: [{"index": number, "type": "warning" | "info", "message": "description of issue"}].
+Do not output Markdown formatting like \`\`\`json, explanations, or extra tags. Output ONLY raw JSON.`;
+
+      const userPrompt = `Subtitle Cues to analyze:
+${JSON.stringify(cues.map(c => ({ index: c.index, duration: (c.endTime - c.startTime).toFixed(2), text: c.text })))}`;
+
+      let response = '';
+      const win = window as any;
+
+      if (aiSettings.provider === 'chrome') {
+        if (!win.ai || !win.ai.languageModel) {
+          throw new Error("Chrome built-in AI (window.ai.languageModel) is not available.");
+        }
+        const session = await win.ai.languageModel.create({
+          systemPrompt: systemPrompt
+        });
+        response = await session.prompt(userPrompt);
+        session.destroy();
+      } else {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json'
+        };
+        if (aiSettings.apiKey) {
+          headers['Authorization'] = `Bearer ${aiSettings.apiKey}`;
+        }
+        const apiRes = await fetch(`${aiSettings.endpoint.replace(/\/$/, '')}/chat/completions`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            model: aiSettings.model,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt }
+            ],
+            temperature: 0.1
+          })
+        });
+        if (!apiRes.ok) {
+          const errText = await apiRes.text();
+          throw new Error(`API Error (${apiRes.status}): ${errText || apiRes.statusText}`);
+        }
+        const data = await apiRes.json();
+        response = data?.choices?.[0]?.message?.content || '';
+      }
+
+      const cleanJson = response.replace(/```json/g, '').replace(/```/g, '').trim();
+      const parsedIssues = JSON.parse(cleanJson);
+
+      if (Array.isArray(parsedIssues)) {
+        setQualityIssues(parsedIssues);
+        setCheckedAt(new Date().toLocaleTimeString());
+        setIsSuccess(true);
+      } else {
+        throw new Error("AI Quality Check output format error.");
+      }
+
+    } catch (err: any) {
+      console.error("AI Quality Check error:", err);
+      setAlignError(err.message || "Failed to run AI Quality Check.");
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
   const formatTime = (secs: number) => {
     const minutes = Math.floor(secs / 60);
     const seconds = Math.floor(secs % 60);
@@ -612,6 +702,85 @@ ${cue.text}`;
             <div className="ai-warning-box">
               <AlertTriangle size={14} className="warning-icon" />
               <span>AI Translation is unavailable. Configure an API provider in settings.</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Quality Check panel */}
+      {cues.length > 0 && (
+        <div className="quality-actions-panel animate-fade-in">
+          <div className="divider-line" />
+          
+          <div className="card-header-inline sub-header">
+            <ShieldAlert className="icon text-primary animate-pulse" size={16} />
+            <h4>AI Subtitle Quality Inspector</h4>
+          </div>
+
+          <p className="ai-description small">
+            Scan your subtitles for timing issues, line length warnings, reading speed limits, or typo recommendations using local AI.
+          </p>
+
+          {aiSettings.provider === 'openai' || aiAvailable === 'yes' ? (
+            <div className="quality-controls">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  onClick={runQualityCheck}
+                  disabled={isChecking}
+                  className="btn btn-primary btn-sm btn-icon"
+                  type="button"
+                >
+                  <ClipboardCheck size={14} />
+                  {isChecking ? "Inspecting..." : "Run Quality Check"}
+                </button>
+
+                {checkedAt && (
+                  <span className="last-checked-label">Last check: {checkedAt}</span>
+                )}
+              </div>
+
+              {/* Quality Issues List */}
+              {checkedAt && (
+                <div className="quality-issues-box animate-slide-down">
+                  {qualityIssues.length === 0 ? (
+                    <div className="quality-clear-message">
+                      <Check size={16} className="success-icon" style={{ color: 'var(--success)' }} />
+                      <span>All clear! No formatting, timing, or text speed warnings found.</span>
+                    </div>
+                  ) : (
+                    <div className="issues-list">
+                      {qualityIssues.map((issue, idx) => {
+                        const targetCue = cues.find(c => c.index === issue.index);
+                        return (
+                          <div key={idx} className={`issue-item ${issue.type}`}>
+                            <span className="issue-icon">
+                              {issue.type === 'warning' ? '⚠️' : 'ℹ️'}
+                            </span>
+                            <div className="issue-details">
+                              <span className="issue-text">{issue.message}</span>
+                              {targetCue && onSeek && (
+                                <button
+                                  onClick={() => onSeek(targetCue.startTime)}
+                                  className="btn-jump-cue"
+                                  title={`Jump to Cue #${issue.index} at ${formatTime(targetCue.startTime)}`}
+                                  type="button"
+                                >
+                                  Jump to Cue #{issue.index} ➔
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="ai-warning-box">
+              <AlertTriangle size={14} className="warning-icon" />
+              <span>AI Quality Inspector is unavailable. Configure an API provider in settings.</span>
             </div>
           )}
         </div>
