@@ -915,6 +915,7 @@ function App() {
                   }}
                   aiSettings={aiSettings}
                   onUpdateAiSettings={handleUpdateAiSettings}
+                  onSeek={handleSeek}
                 />
               )}
               {!subtitleFileName && (

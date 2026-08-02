@@ -65,9 +65,9 @@ Integrate Chrome's built-in AI models (Gemini Nano) and Web Speech APIs to perfo
 *   **Concept**: Translate subtitles locally using the browser's built-in Gemini Nano model or third-party compatible APIs.
 *   **Implementation**: Fully supports built-in Chrome models and custom OpenAI-compatible server APIs.
 
-### [ ] B. Subtitle Quality Check & Context Analysis (Chrome Prompt API / Gemini Nano)
-*   **Concept**: Analyze subtitle text using Chrome's built-in Gemini Nano model to run semantic checks.
-*   **Implementation Strategy**: Prompt local sessions to analyze line breaks or translations.
+### [x] B. Subtitle Quality Check & Context Analysis (Chrome Prompt API / Gemini Nano & OpenAI)
+*   **Concept**: Analyze subtitle text using Chrome's built-in Gemini Nano model or OpenAI provider to run semantic and timing checks.
+*   **Implementation**: Prompt local sessions to scan for excessive line lengths, reading rate warnings, grammar issues, or better line splits, with direct click-to-seek jump hooks.
 
 ### [x] C. Voice-to-Text Speech Recognition (Web Speech API)
 *   **Concept**: Recognize speech from the media playback to auto-generate timing blocks or highlight spoken segments.
