@@ -45,7 +45,9 @@ function App() {
     );
   }, [activeTrackId]);
 
-  // Reference subtitle track states
+  // Workspace state & remote loading tracking
+  const [isWorkspaceReady, setIsWorkspaceReady] = useState(false);
+  const [isLoadingRemoteSubtitles, setIsLoadingRemoteSubtitles] = useState(false);
   const [remoteLoadError, setRemoteLoadError] = useState<string | null>(null);
   const [submitUrl, setSubmitUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -78,6 +80,10 @@ function App() {
     const formatParam = params.get('format');
     const langParam = params.get('lang');
 
+    if (mediaParam && subtitlesParam) {
+      setIsWorkspaceReady(true);
+    }
+
     if (submitParam) {
       setSubmitUrl(decodeURIComponent(submitParam));
     }
@@ -104,6 +110,7 @@ function App() {
     }
 
     if (subtitlesParam) {
+      setIsLoadingRemoteSubtitles(true);
       const subUrl = decodeURIComponent(subtitlesParam);
       fetch(subUrl)
         .then(res => {
@@ -117,6 +124,9 @@ function App() {
         .catch(err => {
           console.error("Failed to load remote subtitles:", err);
           setRemoteLoadError("Failed to fetch remote subtitles. Check your internet connection or CORS settings on the file host.");
+        })
+        .finally(() => {
+          setIsLoadingRemoteSubtitles(false);
         });
     }
   }, []);
@@ -236,42 +246,91 @@ function App() {
   };
 
   // Cue mutation actions
-  const handleAddCue = useCallback((insertAfterId?: string) => {
+  const handleAddCue = useCallback((targetCueId?: string, position: 'before' | 'after' = 'after', atCurrentTime: boolean = false) => {
     const newId = generateId();
     
     setActiveCues((prevCues) => {
-      let newCueStart = playerRef.current?.currentTime || 0;
-      
-      if (prevCues.length > 0) {
-        if (insertAfterId) {
-          const afterCue = prevCues.find(c => c.id === insertAfterId);
-          if (afterCue) {
-            newCueStart = afterCue.endTime + 0.1;
+      let newCueStart = 0;
+      let newCueEnd = 2.0;
+
+      if (atCurrentTime) {
+        newCueStart = playerRef.current?.currentTime || 0;
+        newCueEnd = newCueStart + 2.0;
+      } else if (targetCueId && prevCues.length > 0) {
+        const targetIdx = prevCues.findIndex(c => c.id === targetCueId);
+        if (targetIdx !== -1) {
+          const targetCue = prevCues[targetIdx];
+          if (position === 'before') {
+            const prevCue = targetIdx > 0 ? prevCues[targetIdx - 1] : null;
+            if (prevCue) {
+              newCueStart = Math.max(prevCue.endTime + 0.1, targetCue.startTime - 2.1);
+            } else {
+              newCueStart = Math.max(0, targetCue.startTime - 2.1);
+            }
+            newCueEnd = Math.min(newCueStart + 2.0, Math.max(newCueStart + 0.5, targetCue.startTime - 0.1));
+          } else {
+            newCueStart = targetCue.endTime + 0.1;
+            const nextCue = targetIdx < prevCues.length - 1 ? prevCues[targetIdx + 1] : null;
+            if (nextCue && newCueStart + 2.0 > nextCue.startTime) {
+              newCueEnd = Math.max(newCueStart + 0.5, nextCue.startTime - 0.1);
+            } else {
+              newCueEnd = newCueStart + 2.0;
+            }
           }
-        } else {
-          const lastCue = prevCues[prevCues.length - 1];
-          newCueStart = lastCue.endTime + 0.1;
         }
+      } else if (prevCues.length > 0) {
+        const lastCue = prevCues[prevCues.length - 1];
+        newCueStart = lastCue.endTime + 0.1;
+        newCueEnd = newCueStart + 2.0;
+      } else {
+        newCueStart = playerRef.current?.currentTime || 0;
+        newCueEnd = newCueStart + 2.0;
       }
+
+      const formattedStart = Number(newCueStart.toFixed(3));
+      const formattedEnd = Number(newCueEnd.toFixed(3));
 
       const newCue: SubtitleCue = {
         id: newId,
         index: 1, // Will be reindexed
-        startTime: newCueStart,
-        endTime: newCueStart + 2.0,
-        originalStartTime: newCueStart,
-        originalEndTime: newCueStart + 2.0,
+        startTime: formattedStart,
+        endTime: formattedEnd,
+        originalStartTime: formattedStart,
+        originalEndTime: formattedEnd,
         text: 'New Subtitle',
       };
 
       let updatedCues: SubtitleCue[] = [];
-      if (insertAfterId) {
-        const insertIndex = prevCues.findIndex(c => c.id === insertAfterId);
-        updatedCues = [
-          ...prevCues.slice(0, insertIndex + 1),
-          newCue,
-          ...prevCues.slice(insertIndex + 1)
-        ];
+      if (atCurrentTime) {
+        const insertIndex = prevCues.findIndex(c => c.startTime > formattedStart);
+        if (insertIndex === -1) {
+          updatedCues = [...prevCues, newCue];
+        } else {
+          updatedCues = [
+            ...prevCues.slice(0, insertIndex),
+            newCue,
+            ...prevCues.slice(insertIndex)
+          ];
+        }
+      } else if (targetCueId && prevCues.length > 0) {
+        const targetIdx = prevCues.findIndex(c => c.id === targetCueId);
+        if (targetIdx !== -1) {
+          if (position === 'before') {
+            updatedCues = [
+              ...prevCues.slice(0, targetIdx),
+              newCue,
+              ...prevCues.slice(targetIdx)
+            ];
+          } else {
+            updatedCues = [
+              ...prevCues.slice(0, targetIdx + 1),
+              newCue,
+              ...prevCues.slice(targetIdx + 1)
+            ];
+          }
+        } else {
+          updatedCues = [...prevCues, newCue];
+        }
       } else {
         updatedCues = [...prevCues, newCue];
       }
@@ -841,7 +900,7 @@ function App() {
       </header>
 
       <main className="dashboard-grid">
-        {!mediaFile ? (
+        {!(mediaFile && isWorkspaceReady) ? (
           <div style={{ gridColumn: '1 / -1' }}>
             <FileDropZone
               mediaFile={mediaFile}
@@ -860,6 +919,8 @@ function App() {
               onMediaLoaded={handleMediaLoaded}
               onSubtitlesLoaded={handleSubtitlesLoaded}
               onCreateNewSubtitles={handleCreateNewSubtitles}
+              onStartWorkspace={() => setIsWorkspaceReady(true)}
+              isLoadingRemoteSubtitles={isLoadingRemoteSubtitles}
               remoteLoadError={remoteLoadError}
             />
           </div>

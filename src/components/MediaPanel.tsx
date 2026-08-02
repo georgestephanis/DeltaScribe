@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Play, Pause, RotateCcw, SkipBack, SkipForward, Volume2, Activity, BarChart3, Waves } from 'lucide-react';
+import { Play, Pause, RotateCcw, RotateCw, SkipBack, SkipForward, Rewind, FastForward, Volume2, Activity, BarChart3, Waves } from 'lucide-react';
 import type { SubtitleCue } from '../utils/subtitles';
 
 interface MediaPanelProps {
@@ -26,7 +26,7 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
   onPlayStateChange,
 }) => {
   const isAudio = mediaFile.type.startsWith('audio/');
-  const [visualizerMode, setVisualizerMode] = useState<'waveform' | 'spectrum' | 'spectrogram'>('waveform');
+  const [visualizerMode, setVisualizerMode] = useState<'waveform' | 'spectrum' | 'spectrogram'>('spectrogram');
   const [corsError, setCorsError] = useState(false);
 
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -469,25 +469,35 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
         </div>
 
         {/* Buttons */}
-        <div className="control-buttons">
-          <button onClick={() => skip(-5)} className="btn-icon" title="Rewind 5s" type="button">
-            <SkipBack size={20} />
+        <div className="segmented-transport-controls">
+          <button onClick={() => skip(-30)} className="btn-segmented" title="Rewind 30s" type="button">
+            <Rewind size={14} />
+            <span className="btn-segmented-label">-30s</span>
           </button>
-          <button onClick={() => skip(-0.5)} className="btn-icon" title="Rewind 0.5s" type="button">
-            <RotateCcw size={16} />
-            <span className="btn-icon-subtext">-0.5s</span>
+          <button onClick={() => skip(-5)} className="btn-segmented" title="Rewind 5s" type="button">
+            <SkipBack size={14} />
+            <span className="btn-segmented-label">-5s</span>
+          </button>
+          <button onClick={() => skip(-0.5)} className="btn-segmented" title="Rewind 0.5s" type="button">
+            <RotateCcw size={13} />
+            <span className="btn-segmented-label">-0.5s</span>
           </button>
           
-          <button onClick={handlePlayPause} className="btn-play-pause btn-primary" title={isPlaying ? "Pause" : "Play"} type="button">
-            {isPlaying ? <Pause size={28} /> : <Play size={28} />}
+          <button onClick={handlePlayPause} className="btn-play-pause-main btn-primary" title={isPlaying ? "Pause" : "Play"} type="button">
+            {isPlaying ? <Pause size={22} /> : <Play size={22} />}
           </button>
 
-          <button onClick={() => skip(0.5)} className="btn-icon" title="Forward 0.5s" type="button">
-            <span className="btn-icon-subtext">+0.5s</span>
-            <RotateCcw size={16} style={{ transform: 'scaleX(-1)' }} />
+          <button onClick={() => skip(0.5)} className="btn-segmented" title="Forward 0.5s" type="button">
+            <span className="btn-segmented-label">+0.5s</span>
+            <RotateCw size={13} />
           </button>
-          <button onClick={() => skip(5)} className="btn-icon" title="Forward 5s" type="button">
-            <SkipForward size={20} />
+          <button onClick={() => skip(5)} className="btn-segmented" title="Forward 5s" type="button">
+            <span className="btn-segmented-label">+5s</span>
+            <SkipForward size={14} />
+          </button>
+          <button onClick={() => skip(30)} className="btn-segmented" title="Forward 30s" type="button">
+            <span className="btn-segmented-label">+30s</span>
+            <FastForward size={14} />
           </button>
         </div>
       </div>

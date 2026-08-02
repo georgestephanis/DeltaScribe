@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Plus, Trash2, Search, FastForward, SlidersHorizontal, Lock, Unlock, Scissors, RotateCcw, Copy, Settings, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline, Anchor, Play } from 'lucide-react';
+import { Plus, Trash2, Search, FastForward, SlidersHorizontal, Lock, Unlock, Scissors, RotateCcw, Copy, Settings, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline, Anchor, Play, ChevronDown, Clock } from 'lucide-react';
 import type { SubtitleCue } from '../utils/subtitles';
+import { __ } from '../utils/i18n';
 
 interface SubtitleEditorProps {
   cues: SubtitleCue[];
@@ -12,7 +13,7 @@ interface SubtitleEditorProps {
   onSelectCue: (id: string) => void;
   onChangeCue: (id: string, updatedFields: Partial<SubtitleCue>) => void;
   onDeleteCue: (id: string) => void;
-  onAddCue: (insertAfterId?: string) => void;
+  onAddCue: (targetCueId?: string, position?: 'before' | 'after', atCurrentTime?: boolean) => void;
   onSplitCue: (id: string) => void;
   onShiftTimes: (seconds: number, target: 'all' | 'selected') => void;
   onSeek: (time: number) => void;
@@ -28,14 +29,14 @@ interface SubtitleEditorProps {
   onChangeScalingOptions: (opts: { anchorStart: boolean; anchorEnd: boolean }) => void;
   onClearAllAnchors: () => void;
   duration: number;
-  onValidateOrder: (id: string) => void;
+  onValidateOrder?: (id: string) => void;
 }
 
 interface AutoExpandingTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   value: string;
 }
 
-const AutoExpandingTextarea: React.FC<AutoExpandingTextareaProps> = ({ value, ...props }) => {
+function AutoExpandingTextarea({ value, ...props }: AutoExpandingTextareaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const adjustHeight = () => {
@@ -92,6 +93,18 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
   const [shiftAmount, setShiftAmount] = useState('1.0');
   const [showShiftControls, setShowShiftControls] = useState(false);
   const [showPlaybackOptions, setShowPlaybackOptions] = useState(false);
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const addMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) {
+        setShowAddMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   const [autoSeek, setAutoSeek] = useState(true);
   const [leadIn, setLeadIn] = useState(true);
   const listContainerRef = useRef<HTMLDivElement>(null);
@@ -316,12 +329,12 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
 
   const handleTimeBlur = (id: string) => {
     onFocusInput(false);
-    onValidateOrder(id);
+    onValidateOrder?.(id);
   };
 
   const handleOffsetBlur = (id: string, field: 'startTime' | 'endTime') => {
     onFocusInput(false);
-    onValidateOrder(id);
+    onValidateOrder?.(id);
     setOffsetInputs((prev) => {
       const next = { ...prev };
       if (next[id]) {
@@ -393,47 +406,82 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
             Rich Text
           </button>
 
-          {/* Scaling Mode Toggle */}
-          <button
-            onClick={onToggleScalingMode}
-            className={`btn btn-sm ${scalingModeEnabled ? 'btn-primary active' : 'btn-secondary'}`}
-            title="Toggle Scaling Mode: recalculate timings between manual anchor points"
-            type="button"
-          >
-            <Anchor size={16} />
-            {scalingModeEnabled ? "Scaling Mode On" : "Scaling Mode Off"}
-          </button>
+          {/* Split Add Cue Dropdown Group */}
+          <div className="split-button-group" ref={addMenuRef}>
+            <button
+              onClick={() => onAddCue()}
+              className="btn btn-secondary btn-sm main-action-btn"
+              title="Add Subtitle Cue to the end"
+              type="button"
+            >
+              <Plus size={16} />
+              <span>{__('Add Cue')}</span>
+            </button>
+            <button
+              onClick={() => setShowAddMenu(!showAddMenu)}
+              className={`btn btn-secondary btn-sm dropdown-toggle-btn ${showAddMenu ? 'active' : ''}`}
+              title="More insertion options"
+              type="button"
+            >
+              <ChevronDown size={14} />
+            </button>
 
-          {/* Add a general button */}
-          <button
-            onClick={() => onAddCue()}
-            className="btn btn-secondary btn-sm"
-            title="Add Subtitle Cue to the end"
-            type="button"
-          >
-            <Plus size={16} />
-            Add Cue
-          </button>
+            {showAddMenu && (
+              <div className="dropdown-menu-panel">
+                <button
+                  onClick={() => {
+                    onAddCue(undefined, 'after', false);
+                    setShowAddMenu(false);
+                  }}
+                  className="dropdown-menu-item"
+                  type="button"
+                >
+                  <Plus size={14} />
+                  <span>{__('Add Cue at End')}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    onAddCue(undefined, 'after', true);
+                    setShowAddMenu(false);
+                  }}
+                  className="dropdown-menu-item"
+                  type="button"
+                >
+                  <Clock size={14} />
+                  <span>{__('Add Cue @ Current Time')}</span>
+                </button>
+              </div>
+            )}
+          </div>
 
-          {/* Toggle Shift times helper */}
-          <button
-            onClick={() => setShowShiftControls(!showShiftControls)}
-            className={`btn btn-sm btn-icon-only ${showShiftControls ? 'active' : ''}`}
-            title="Shift times in bulk"
-            type="button"
-          >
-            <SlidersHorizontal size={16} />
-          </button>
-
-          {/* Toggle Playback Options helper */}
-          <button
-            onClick={() => setShowPlaybackOptions(!showPlaybackOptions)}
-            className={`btn btn-sm btn-icon-only ${showPlaybackOptions ? 'active' : ''}`}
-            title="Playback sync & seek settings"
-            type="button"
-          >
-            <Play size={16} />
-          </button>
+          {/* Segmented Timing & Playback Controls Group */}
+          <div className="segmented-button-group">
+            <button
+              onClick={onToggleScalingMode}
+              className={`btn btn-sm ${scalingModeEnabled ? 'btn-primary' : 'btn-secondary'}`}
+              title="Toggle Scaling Mode: recalculate timings between manual anchor points"
+              type="button"
+            >
+              <Anchor size={15} />
+              <span>{scalingModeEnabled ? __('Scaling On') : __('Scaling Off')}</span>
+            </button>
+            <button
+              onClick={() => setShowShiftControls(!showShiftControls)}
+              className={`btn btn-sm ${showShiftControls ? 'active' : ''}`}
+              title="Shift times in bulk"
+              type="button"
+            >
+              <SlidersHorizontal size={15} />
+            </button>
+            <button
+              onClick={() => setShowPlaybackOptions(!showPlaybackOptions)}
+              className={`btn btn-sm ${showPlaybackOptions ? 'active' : ''}`}
+              title="Playback sync & seek settings"
+              type="button"
+            >
+              <Play size={15} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -575,10 +623,21 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
             const isOverlapping = nextCue !== undefined && cue.endTime > nextCue.startTime;
 
             return (
-              <div
-                key={cue.id}
-                id={`cue-card-${cue.id}`}
-                className={`cue-card ${isActive ? 'active-playing' : ''} ${isSelected ? 'selected' : ''} ${isManualAnchor ? 'manual-anchor' : ''} ${isAutoAdjusted ? 'auto-adjusted' : ''}`}
+              <div key={cue.id} className="cue-card-wrapper">
+                <div className="cue-hover-insert-line">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onAddCue(cue.id, 'before'); }}
+                    className="btn-hover-insert"
+                    title={`Insert cue before #${cue.index}`}
+                    type="button"
+                  >
+                    <Plus size={12} />
+                    <span>{__('Insert Cue Before')}</span>
+                  </button>
+                </div>
+                <div
+                  id={`cue-card-${cue.id}`}
+                  className={`cue-card ${isActive ? 'active-playing' : ''} ${isSelected ? 'selected' : ''} ${isManualAnchor ? 'manual-anchor' : ''} ${isAutoAdjusted ? 'auto-adjusted' : ''}`}
                 onClick={() => {
                   onSelectCue(cue.id);
                   if (autoSeek) {
@@ -833,12 +892,22 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
                       <Scissors size={14} />
                     </button>
                     <button
-                      onClick={(e) => { e.stopPropagation(); onAddCue(cue.id); }}
+                      onClick={(e) => { e.stopPropagation(); onAddCue(cue.id, 'before'); }}
+                      className="btn-icon-only-sm"
+                      title="Insert cue before this"
+                      type="button"
+                    >
+                      <span className="btn-badge-sub">↑</span>
+                      <Plus size={12} />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onAddCue(cue.id, 'after'); }}
                       className="btn-icon-only-sm"
                       title="Insert cue after this"
                       type="button"
                     >
-                      <Plus size={14} />
+                      <Plus size={12} />
+                      <span className="btn-badge-sub">↓</span>
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); onDeleteCue(cue.id); }}
@@ -972,7 +1041,8 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
                   })()}
                 </div>
               </div>
-            );
+            </div>
+          );
           })
         )}
       </div>

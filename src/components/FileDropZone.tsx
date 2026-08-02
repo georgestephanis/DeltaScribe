@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Upload, FileVideo, FileAudio, FileText, CheckCircle2 } from 'lucide-react';
+import { Upload, FileVideo, FileAudio, FileText, CheckCircle2, Loader2, ArrowRight } from 'lucide-react';
 import { __, sprintf } from '../utils/i18n';
 
 interface FileDropZoneProps {
@@ -11,6 +11,8 @@ interface FileDropZoneProps {
   onMediaLoaded: (file: File) => void;
   onSubtitlesLoaded: (text: string, fileName: string) => void;
   onCreateNewSubtitles: () => void;
+  onStartWorkspace?: () => void;
+  isLoadingRemoteSubtitles?: boolean;
   remoteLoadError?: string | null;
 }
 
@@ -23,9 +25,12 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
   onMediaLoaded,
   onSubtitlesLoaded,
   onCreateNewSubtitles,
+  onStartWorkspace,
+  isLoadingRemoteSubtitles = false,
   remoteLoadError,
 }) => {
   const [isDragActive, setIsDragActive] = useState(false);
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
   const [unrecognizedFileError, setUnrecognizedFileError] = useState<string | null>(null);
   const mediaInputRef = useRef<HTMLInputElement>(null);
   const srtInputRef = useRef<HTMLInputElement>(null);
@@ -41,7 +46,9 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
   };
 
   const processFiles = (files: FileList) => {
+    setIsProcessingFile(true);
     const unrecognizedNames: string[] = [];
+    let pendingReaders = 0;
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -50,17 +57,32 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
       if (file.type.startsWith('video/') || file.type.startsWith('audio/') || ['mp4', 'webm', 'ogg', 'mp3', 'wav', 'm4a'].includes(ext || '')) {
         onMediaLoaded(file);
       } else if (ext === 'srt' || ext === 'vtt' || ext === 'xml' || ext === 'ttml') {
+        pendingReaders++;
         const reader = new FileReader();
         reader.onload = (event) => {
           const text = event.target?.result as string;
           if (text) {
             onSubtitlesLoaded(text, file.name);
           }
+          pendingReaders--;
+          if (pendingReaders <= 0) {
+            setIsProcessingFile(false);
+          }
+        };
+        reader.onerror = () => {
+          pendingReaders--;
+          if (pendingReaders <= 0) {
+            setIsProcessingFile(false);
+          }
         };
         reader.readAsText(file);
       } else {
         unrecognizedNames.push(file.name);
       }
+    }
+
+    if (pendingReaders === 0) {
+      setIsProcessingFile(false);
     }
 
     setUnrecognizedFileError(
@@ -142,21 +164,38 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
               onClick={() => mediaInputRef.current?.click()}
               className="btn btn-primary"
               type="button"
+              disabled={isProcessingFile || isLoadingRemoteSubtitles}
             >
-              {__('Select Media File')}
+              {isProcessingFile ? (
+                <>
+                  <Loader2 className="spinner-icon" size={16} />
+                  <span>{__('Loading Media...')}</span>
+                </>
+              ) : (
+                __('Select Media File')
+              )}
             </button>
             <button
               onClick={() => srtInputRef.current?.click()}
               className="btn btn-secondary"
               type="button"
+              disabled={isProcessingFile || isLoadingRemoteSubtitles}
             >
-              {subtitleTracks.length > 0 ? __('Add Subtitle File') : __('Select Subtitle File')}
+              {isProcessingFile || isLoadingRemoteSubtitles ? (
+                <>
+                  <Loader2 className="spinner-icon" size={16} />
+                  <span>{__('Reading Subtitles...')}</span>
+                </>
+              ) : (
+                subtitleTracks.length > 0 ? __('Add Subtitle File') : __('Select Subtitle File')
+              )}
             </button>
             {subtitleTracks.length === 0 && (
               <button
                 onClick={onCreateNewSubtitles}
                 className="btn btn-text"
                 type="button"
+                disabled={isProcessingFile || isLoadingRemoteSubtitles}
               >
                 {__('Create New Subtitles')}
               </button>
@@ -165,10 +204,42 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
         </div>
       </div>
 
+      {mediaFile && (
+        <div className="ready-to-go-banner">
+          <div className="banner-info">
+            <CheckCircle2 className="ready-icon" size={28} />
+            <div>
+              <h4>{__('Media Asset Ready')}</h4>
+              <p>
+                {subtitleTracks.length > 0
+                  ? sprintf(__('%d subtitle track(s) loaded. Click below to start editing!'), subtitleTracks.length)
+                  : __('No subtitle file added yet. You can add one now or proceed with an empty track.')}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              if (subtitleTracks.length === 0) {
+                onCreateNewSubtitles();
+              }
+              onStartWorkspace?.();
+            }}
+            className="btn btn-primary btn-lg ready-btn"
+            type="button"
+            disabled={isProcessingFile || isLoadingRemoteSubtitles}
+          >
+            <span>{__('Ready to Go')}</span>
+            <ArrowRight size={20} />
+          </button>
+        </div>
+      )}
+
       <div className="loaded-assets">
         <div className="asset-card">
           <div className="card-header">
-            {mediaFile ? (
+            {isProcessingFile ? (
+              <Loader2 className="icon spinner-icon text-primary" />
+            ) : mediaFile ? (
               isAudio ? <FileAudio className="icon text-audio" /> : <FileVideo className="icon text-video" />
             ) : (
               <FileVideo className="icon text-muted" />
@@ -189,7 +260,11 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
 
         <div className="asset-card full-width-card">
           <div className="card-header">
-            <FileText className={`icon ${subtitleTracks.length > 0 ? 'text-primary' : 'text-muted'}`} />
+            {isLoadingRemoteSubtitles || isProcessingFile ? (
+              <Loader2 className="icon spinner-icon text-primary" />
+            ) : (
+              <FileText className={`icon ${subtitleTracks.length > 0 ? 'text-primary' : 'text-muted'}`} />
+            )}
             <h4>{sprintf(__('Subtitle Tracks (%d)'), subtitleTracks.length)}</h4>
           </div>
           <div className="card-body">
