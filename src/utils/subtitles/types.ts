@@ -8,4 +8,5 @@ export interface SubtitleCue {
   originalEndTime?: number; // original end time anchor
   align?: 'left' | 'center' | 'right';
   line?: string; // WebVTT line settings, e.g. "10%", "90%", "auto"
+  isAnchor?: boolean;
 }

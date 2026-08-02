@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Plus, Trash2, Search, FastForward, SlidersHorizontal, Lock, Unlock, Scissors, RotateCcw, Copy, Settings, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline } from 'lucide-react';
+import { Plus, Trash2, Search, FastForward, SlidersHorizontal, Lock, Unlock, Scissors, RotateCcw, Copy, Settings, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline, Anchor } from 'lucide-react';
 import type { SubtitleCue } from '../utils/subtitles';
 
 interface SubtitleEditorProps {
@@ -22,6 +22,13 @@ interface SubtitleEditorProps {
   setEnableAlignment: (val: boolean) => void;
   enableFormatting: boolean;
   setEnableFormatting: (val: boolean) => void;
+  scalingModeEnabled: boolean;
+  onToggleScalingMode: () => void;
+  scalingOptions: { anchorStart: boolean; anchorEnd: boolean };
+  onChangeScalingOptions: (opts: { anchorStart: boolean; anchorEnd: boolean }) => void;
+  onClearAllAnchors: () => void;
+  duration: number;
+  onValidateOrder: (id: string) => void;
 }
 
 interface AutoExpandingTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -73,6 +80,13 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
   setEnableAlignment,
   enableFormatting,
   setEnableFormatting,
+  scalingModeEnabled,
+  onToggleScalingMode,
+  scalingOptions,
+  onChangeScalingOptions,
+  onClearAllAnchors,
+  duration,
+  onValidateOrder,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [shiftAmount, setShiftAmount] = useState('1.0');
@@ -297,8 +311,14 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
     }
   };
 
+  const handleTimeBlur = (id: string) => {
+    onFocusInput(false);
+    onValidateOrder(id);
+  };
+
   const handleOffsetBlur = (id: string, field: 'startTime' | 'endTime') => {
     onFocusInput(false);
+    onValidateOrder(id);
     setOffsetInputs((prev) => {
       const next = { ...prev };
       if (next[id]) {
@@ -368,6 +388,17 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
             type="button"
           >
             Rich Text
+          </button>
+
+          {/* Scaling Mode Toggle */}
+          <button
+            onClick={onToggleScalingMode}
+            className={`btn btn-sm ${scalingModeEnabled ? 'btn-primary active' : 'btn-secondary'}`}
+            title="Toggle Scaling Mode: recalculate timings between manual anchor points"
+            type="button"
+          >
+            <Anchor size={16} />
+            {scalingModeEnabled ? "Scaling Mode On" : "Scaling Mode Off"}
           </button>
 
           {/* Add a general button */}
@@ -444,6 +475,39 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
         </div>
       )}
 
+      {scalingModeEnabled && (
+        <div className="scaling-helper-panel animate-slide-down">
+          <span className="helper-label">Scaling Mode Options:</span>
+          <div className="scaling-row">
+            <label className="checkbox-label" title="Anchor the start of the video (0:00) as fixed at 0:00">
+              <input
+                type="checkbox"
+                checked={scalingOptions.anchorStart}
+                onChange={(e) => onChangeScalingOptions({ ...scalingOptions, anchorStart: e.target.checked })}
+              />
+              Anchor Start (0:00)
+            </label>
+            <label className="checkbox-label" title="Anchor the end of the video as fixed at its original duration">
+              <input
+                type="checkbox"
+                checked={scalingOptions.anchorEnd}
+                onChange={(e) => onChangeScalingOptions({ ...scalingOptions, anchorEnd: e.target.checked })}
+              />
+              Anchor End ({formatSeconds(duration)})
+            </label>
+            <button
+              onClick={onClearAllAnchors}
+              className="btn btn-danger btn-xs"
+              title="Clear all manual anchors and reset timings"
+              type="button"
+              style={{ marginLeft: 'auto' }}
+            >
+              Clear All Anchors
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Cues List */}
       <div className="cues-list-scroller" ref={listContainerRef}>
         {filteredCues.length === 0 ? (
@@ -463,15 +527,53 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
             const isActive = currentActiveCue?.id === cue.id;
             const isSelected = selectedCueId === cue.id;
 
+            const isManualAnchor = scalingModeEnabled && cue.isAnchor;
+            const isAutoAdjusted = scalingModeEnabled && !cue.isAnchor && (
+              (cue.originalStartTime !== undefined && Math.abs(cue.startTime - cue.originalStartTime) > 0.001) ||
+              (cue.originalEndTime !== undefined && Math.abs(cue.endTime - cue.originalEndTime) > 0.001)
+            );
+
+            const nextCue = cues.find(c => c.index === cue.index + 1);
+            const isOverlapping = nextCue !== undefined && cue.endTime > nextCue.startTime;
+
             return (
               <div
                 key={cue.id}
                 id={`cue-card-${cue.id}`}
-                className={`cue-card ${isActive ? 'active-playing' : ''} ${isSelected ? 'selected' : ''}`}
+                className={`cue-card ${isActive ? 'active-playing' : ''} ${isSelected ? 'selected' : ''} ${isManualAnchor ? 'manual-anchor' : ''} ${isAutoAdjusted ? 'auto-adjusted' : ''}`}
                 onClick={() => onSelectCue(cue.id)}
               >
                 <div className="cue-header">
-                  <div className="cue-index-badge">#{cue.index}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div className="cue-index-badge">#{cue.index}</div>
+                    {scalingModeEnabled && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onChangeCue(cue.id, { isAnchor: !cue.isAnchor });
+                        }}
+                        className={`btn-anchor-toggle ${cue.isAnchor ? 'active' : ''}`}
+                        title={cue.isAnchor ? "Remove timing anchor (recalculate timing)" : "Set timing anchor"}
+                        type="button"
+                      >
+                        <Anchor size={12} />
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {isManualAnchor && (
+                      <span className="badge badge-anchor" title="Manually anchored timing">
+                        <Anchor size={10} />
+                        Anchor
+                      </span>
+                    )}
+                    {isAutoAdjusted && (
+                      <span className="badge badge-auto" title="Automatically adjusted timing via scaling">
+                        Auto
+                      </span>
+                    )}
+                  </div>
                   
                   <div className="cue-timing">
                     <div className="time-field">
@@ -483,12 +585,12 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
                         value={formatSeconds(cue.startTime)}
                         onChange={(e) => handleTimeChange(cue.id, 'startTime', e.target.value)}
                         onFocus={() => onFocusInput(true)}
-                        onBlur={() => onFocusInput(false)}
+                        onBlur={() => handleTimeBlur(cue.id)}
                         className="time-input-box"
                       />
 
                       {cue.originalStartTime !== undefined && (
-                        <div className="offset-badge-container">
+                        <div className={`offset-badge-container ${isManualAnchor ? 'manual-anchor-offset' : ''} ${isAutoAdjusted ? 'auto-adjusted-offset' : ''}`}>
                           <span className="offset-symbol">Δ</span>
                           <input
                             type="text"
@@ -536,8 +638,15 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
 
                     <div className="timing-arrow">➔</div>
 
-                    <div className="time-field">
-                      <label>End</label>
+                    <div className={`time-field ${isOverlapping ? 'overlap-warning-border' : ''}`}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        End
+                        {isOverlapping && (
+                          <span className="overlap-warning-text" title={`Overlaps with Cue #${nextCue.index}`}>
+                            ⚠️ Overlaps #{nextCue.index}
+                          </span>
+                        )}
+                      </label>
                       <input
                         type="number"
                         step="0.01"
@@ -545,12 +654,12 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
                         value={formatSeconds(cue.endTime)}
                         onChange={(e) => handleTimeChange(cue.id, 'endTime', e.target.value)}
                         onFocus={() => onFocusInput(true)}
-                        onBlur={() => onFocusInput(false)}
+                        onBlur={() => handleTimeBlur(cue.id)}
                         className="time-input-box"
                       />
 
                       {cue.originalEndTime !== undefined && (
-                        <div className="offset-badge-container">
+                        <div className={`offset-badge-container ${isManualAnchor ? 'manual-anchor-offset' : ''} ${isAutoAdjusted ? 'auto-adjusted-offset' : ''}`}>
                           <span className="offset-symbol">Δ</span>
                           <input
                             type="text"
@@ -581,6 +690,46 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
                               type="button"
                             >
                               <RotateCcw size={10} />
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {isSelected && (
+                        <div className="end-adjust-group">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onChangeCue(cue.id, { endTime: Math.max(cue.startTime + 0.1, cue.endTime - 0.5) });
+                            }}
+                            className="btn-adjust"
+                            title="Reduce duration by 0.5s"
+                            type="button"
+                          >
+                            -0.5s
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onChangeCue(cue.id, { endTime: cue.endTime + 0.5 });
+                            }}
+                            className="btn-adjust"
+                            title="Extend duration by 0.5s"
+                            type="button"
+                          >
+                            +0.5s
+                          </button>
+                          {nextCue && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onChangeCue(cue.id, { endTime: nextCue.startTime });
+                              }}
+                              className="btn-adjust btn-adjust-stretch"
+                              title={`Stretch end to start of next subtitle (Cue #${nextCue.index})`}
+                              type="button"
+                            >
+                              Stretch to Next
                             </button>
                           )}
                         </div>

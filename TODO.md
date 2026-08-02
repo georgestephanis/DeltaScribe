@@ -4,29 +4,18 @@ Here is a list of features inspired by prior subtitle syncing utilities (such as
 
 ---
 
-## [ ] Feature 1: Subtitle Pace / Speed Scaling
-Adjust all subtitle timing coordinates by a constant factor to fix progressive "sync drift" caused by framerate differences (e.g. 23.976 fps to 25 fps).
+## [x] Feature 1: Subtitle Pace / Speed Scaling (Anchor-based Timing Scaling Mode)
+Adjust and scale subtitle timing coordinates dynamically across a track for live performances or drifted media by setting manual anchor points. Non-anchor cue timings are stretched and compressed between manual anchors using a piecewise linear interpolation algorithm.
 
 ### Implementation Strategy
-1. **Pace Control UI**: Add a Pace Scale input/slider inside the timing shifts panel (default `1.0`).
-2. **Preset Ratios**: Add quick presets for common framerate changes:
-   - `23.976 ➔ 25` (Multiplier: `1.0427`)
-   - `25 ➔ 23.976` (Multiplier: `0.9590`)
-3. **Scaling Logic**: Multiplies `startTime` and `endTime` for selected (or all) cues:
-   ```typescript
-   const handleScalePace = (factor: number, target: 'all' | 'selected') => {
-     setCues(cues.map(c => {
-       if (target === 'all' || c.id === selectedId) {
-         return {
-           ...c,
-           startTime: c.startTime * factor,
-           endTime: c.endTime * factor
-         };
-       }
-       return c;
-     }));
-   };
-   ```
+1. **Timing Scaling Mode UI**: Add a Scaling Mode toggle button (Anchor icon) and option drawer inside SubtitleEditor.
+2. **Manual & Auto Highlights**: Color manual anchor cards in gold/amber and auto-adjusted cards in cyan/blue.
+3. **Piecewise Scaling Logic**: Recalculate all non-anchor cue start and end times dynamically using piecewise linear interpolation based on manual timing anchors.
+    ```typescript
+    // In scaling.ts:
+    const ratio = (tOrig - left.orig) / (right.orig - left.orig);
+    return left.actual + ratio * (right.actual - left.actual);
+    ```
 
 ---
 

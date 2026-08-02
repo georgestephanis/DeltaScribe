@@ -9,6 +9,7 @@ export * from './common';
 export * from './srt';
 export * from './vtt';
 export * from './ttml';
+export * from './scaling';
 
 /**
  * Unified parser entrypoint. Inspects the file contents to auto-detect

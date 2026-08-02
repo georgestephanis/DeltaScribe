@@ -3,7 +3,7 @@ import { FileDropZone } from './components/FileDropZone';
 import { MediaPanel } from './components/MediaPanel';
 import { SubtitleEditor } from './components/SubtitleEditor';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
-import { parseSRT, formatSRT, formatVTT, formatTTML, type SubtitleCue } from './utils/subtitles';
+import { parseSRT, formatSRT, formatVTT, formatTTML, type SubtitleCue, interpolateTime } from './utils/subtitles';
 import { Download, RefreshCw, AlertCircle } from 'lucide-react';
 import { AiAligner } from './components/AiAligner';
 import { __ } from './utils/i18n';
@@ -15,6 +15,8 @@ function App() {
   const [mediaFile, setMediaFile] = useState<{ name: string; type: string; url: string; isRemote?: boolean } | null>(null);
   const [subtitleTracks, setSubtitleTracks] = useState<{ id: string; name: string; cues: SubtitleCue[] }[]>([]);
   const [activeTrackId, setActiveTrackId] = useState<string | null>(null);
+  const [scalingModeEnabled, setScalingModeEnabled] = useState(false);
+  const [scalingOptions, setScalingOptions] = useState({ anchorStart: false, anchorEnd: false });
 
   // Media Playback coordinates
   const [currentTime, setCurrentTime] = useState(0);
@@ -222,6 +224,8 @@ function App() {
       index: 1,
       startTime: playerRef.current?.currentTime || 0,
       endTime: (playerRef.current?.currentTime || 0) + 2.0,
+      originalStartTime: playerRef.current?.currentTime || 0,
+      originalEndTime: (playerRef.current?.currentTime || 0) + 2.0,
       text: 'New Subtitle'
     };
     const newTrack = { id: newTrackId, name: 'new_subtitles.srt', cues: [initialCue] };
@@ -255,6 +259,8 @@ function App() {
         index: 1, // Will be reindexed
         startTime: newCueStart,
         endTime: newCueStart + 2.0,
+        originalStartTime: newCueStart,
+        originalEndTime: newCueStart + 2.0,
         text: 'New Subtitle',
       };
 
@@ -279,11 +285,99 @@ function App() {
     setSelectedCueId(newId);
   }, [setActiveCues]);
 
+  const handleValidateOrder = useCallback((id: string) => {
+    setActiveCues((prevCues) => {
+      const cue = prevCues.find(c => c.id === id);
+      if (!cue) return prevCues;
+
+      const nextCue = prevCues.find(c => c.index === cue.index + 1);
+      if (!nextCue || (cue.startTime < nextCue.startTime && cue.endTime <= nextCue.startTime)) {
+        return prevCues;
+      }
+
+      const confirmResult = window.confirm(
+        `Cue #${cue.index} timing overlaps with Cue #${nextCue.index}.\n\n` +
+        `Click OK to enable Scaling Mode and recalculate timings across all captions using our scaling algorithm.\n` +
+        `Click Cancel to push subsequent subtitles forward to prevent overlap.`
+      );
+
+      let updated = [...prevCues];
+      if (confirmResult) {
+        setTimeout(() => setScalingModeEnabled(true), 0);
+        const anchors: { orig: number; actual: number }[] = [];
+        if (scalingOptions.anchorStart) {
+          anchors.push({ orig: 0, actual: 0 });
+        }
+        if (scalingOptions.anchorEnd && duration) {
+          anchors.push({ orig: duration, actual: duration });
+        }
+
+        updated = updated.map(c => c.id === id ? { ...c, isAnchor: true } : c);
+
+        updated.forEach((c) => {
+          if (c.isAnchor) {
+            if (c.originalStartTime !== undefined) {
+              anchors.push({ orig: c.originalStartTime, actual: c.startTime });
+            }
+            if (c.originalEndTime !== undefined) {
+              anchors.push({ orig: c.originalEndTime, actual: c.endTime });
+            }
+          }
+        });
+
+        updated = updated.map((c) => {
+          if (c.isAnchor) return c;
+
+          const origStart = c.originalStartTime ?? c.startTime;
+          const origEnd = c.originalEndTime ?? c.endTime;
+          const newStart = interpolateTime(origStart, anchors);
+          const newEnd = interpolateTime(origEnd, anchors);
+
+          return {
+            ...c,
+            startTime: newStart,
+            endTime: newEnd >= newStart ? newEnd : newStart + 1.0,
+          };
+        });
+      } else {
+        updated = [...updated].sort((a, b) => a.index - b.index);
+        const targetIdx = updated.findIndex(c => c.id === id);
+        if (targetIdx !== -1) {
+          for (let i = targetIdx + 1; i < updated.length; i++) {
+            const prev = updated[i - 1];
+            const curr = updated[i];
+            if (curr.startTime < prev.endTime) {
+              const durationVal = curr.endTime - curr.startTime;
+              curr.startTime = prev.endTime + 0.1;
+              curr.endTime = curr.startTime + durationVal;
+            }
+          }
+        }
+      }
+
+      return updated.map((c, idx) => ({ ...c, index: idx + 1 }));
+    });
+  }, [setActiveCues, scalingOptions, duration]);
+
   const handleUpdateCue = useCallback((id: string, updatedFields: Partial<SubtitleCue>) => {
     setActiveCues((prevCues) => {
-      const updated = prevCues.map((cue) => {
+      let updated = prevCues.map((cue) => {
         if (cue.id === id) {
           const result = { ...cue, ...updatedFields };
+
+          // Automatically manage anchor state in scaling mode
+          if (scalingModeEnabled) {
+            if (updatedFields.startTime !== undefined || updatedFields.endTime !== undefined) {
+              const isResetStart = updatedFields.startTime !== undefined && updatedFields.startTime === cue.originalStartTime;
+              const isResetEnd = updatedFields.endTime !== undefined && updatedFields.endTime === cue.originalEndTime;
+              if (isResetStart || isResetEnd) {
+                result.isAnchor = false;
+              } else {
+                result.isAnchor = true;
+              }
+            }
+          }
+
           // Validations
           if (result.startTime < 0) result.startTime = 0;
           if (result.endTime < result.startTime) {
@@ -297,10 +391,108 @@ function App() {
         }
         return cue;
       });
-      
+
+      if (scalingModeEnabled) {
+        const anchors: { orig: number; actual: number }[] = [];
+        if (scalingOptions.anchorStart) {
+          anchors.push({ orig: 0, actual: 0 });
+        }
+        if (scalingOptions.anchorEnd && duration) {
+          anchors.push({ orig: duration, actual: duration });
+        }
+
+        updated.forEach((c) => {
+          if (c.isAnchor) {
+            if (c.originalStartTime !== undefined) {
+              anchors.push({ orig: c.originalStartTime, actual: c.startTime });
+            }
+            if (c.originalEndTime !== undefined) {
+              anchors.push({ orig: c.originalEndTime, actual: c.endTime });
+            }
+          }
+        });
+
+        updated = updated.map((c) => {
+          if (c.isAnchor) return c;
+
+          const origStart = c.originalStartTime ?? c.startTime;
+          const origEnd = c.originalEndTime ?? c.endTime;
+          const newStart = interpolateTime(origStart, anchors);
+          const newEnd = interpolateTime(origEnd, anchors);
+
+          return {
+            ...c,
+            startTime: newStart,
+            endTime: newEnd >= newStart ? newEnd : newStart + 1.0,
+          };
+        });
+      }
+
       return updated.map((cue, idx) => ({
         ...cue,
         index: idx + 1
+      }));
+    });
+
+    // Check overlap immediately if NOT focused (e.g. button click or hotkey)
+    if (!isInputFocused) {
+      setTimeout(() => {
+        handleValidateOrder(id);
+      }, 0);
+    }
+  }, [setActiveCues, scalingModeEnabled, scalingOptions, duration, isInputFocused, handleValidateOrder]);
+
+  const triggerRecalculateCues = useCallback(() => {
+    setActiveCues((prevCues) => {
+      const anchors: { orig: number; actual: number }[] = [];
+      if (scalingOptions.anchorStart) {
+        anchors.push({ orig: 0, actual: 0 });
+      }
+      if (scalingOptions.anchorEnd && duration) {
+        anchors.push({ orig: duration, actual: duration });
+      }
+
+      prevCues.forEach((c) => {
+        if (c.isAnchor) {
+          if (c.originalStartTime !== undefined) {
+            anchors.push({ orig: c.originalStartTime, actual: c.startTime });
+          }
+          if (c.originalEndTime !== undefined) {
+            anchors.push({ orig: c.originalEndTime, actual: c.endTime });
+          }
+        }
+      });
+
+      return prevCues.map((c) => {
+        if (c.isAnchor) return c;
+
+        const origStart = c.originalStartTime ?? c.startTime;
+        const origEnd = c.originalEndTime ?? c.endTime;
+        const newStart = interpolateTime(origStart, anchors);
+        const newEnd = interpolateTime(origEnd, anchors);
+
+        return {
+          ...c,
+          startTime: newStart,
+          endTime: newEnd >= newStart ? newEnd : newStart + 1.0,
+        };
+      });
+    });
+  }, [setActiveCues, scalingOptions, duration]);
+
+  useEffect(() => {
+    if (scalingModeEnabled) {
+      triggerRecalculateCues();
+    }
+  }, [scalingModeEnabled, scalingOptions, duration, triggerRecalculateCues]);
+
+  const handleClearAllAnchors = useCallback(() => {
+    setActiveCues((prevCues) => {
+      return prevCues.map((c) => ({
+        ...c,
+        isAnchor: false,
+        startTime: c.originalStartTime ?? c.startTime,
+        endTime: c.originalEndTime ?? c.endTime,
       }));
     });
   }, [setActiveCues]);
@@ -755,6 +947,13 @@ function App() {
                 setEnableAlignment={setEnableAlignment}
                 enableFormatting={enableFormatting}
                 setEnableFormatting={setEnableFormatting}
+                scalingModeEnabled={scalingModeEnabled}
+                onToggleScalingMode={() => setScalingModeEnabled(!scalingModeEnabled)}
+                scalingOptions={scalingOptions}
+                onChangeScalingOptions={setScalingOptions}
+                onClearAllAnchors={handleClearAllAnchors}
+                duration={duration}
+                onValidateOrder={handleValidateOrder}
               />
             </div>
           </>

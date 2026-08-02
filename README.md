@@ -26,6 +26,8 @@ It is designed to align subtitles and audio/video files completely in the browse
 11. **Dynamic Textareas**: Text boxes auto-resize based on input lines to keep all subtitle text fully visible.
 12. **Read-Only / Text Safety Lock**: Toggle lock settings to prevent accidental edits to subtitle text lines while adjusting timings.
 13. **Subtitle Scissors Splitting**: Easily split a subtitle cue in half, automatically slicing both text (by newline or word count) and timing intervals.
+14. **Timing Scaling Mode**: Recalculate timing gaps dynamically across a track for live performances or drifted media by setting manual anchor points. DeltaScribe uses a piecewise linear interpolation algorithm to stretch and compress non-anchor timings between the anchors, with visual distinction (gold/amber for manual anchors, cyan/blue for auto-adjusted cues).
+15. **Subtitle Overlap Validation & Adjustments**: Instantly detect caption collisions with real-time overlap warnings (red borders and `⚠️ Overlaps` badges) when editing endpoints. Fine-tune caption durations on the selected card with single-click `-0.5s` and `+0.5s` shift buttons, or stretch the end time precisely to snap to the beginning of the next subtitle.
 
 ---
 
