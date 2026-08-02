@@ -3,8 +3,9 @@ import { FileDropZone } from './components/FileDropZone';
 import { MediaPanel } from './components/MediaPanel';
 import { SubtitleEditor } from './components/SubtitleEditor';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
+import { AuditLogDrawer, type AuditLogEntry } from './components/AuditLogDrawer';
 import { parseSRT, formatSRT, formatVTT, formatTTML, type SubtitleCue, interpolateTime } from './utils/subtitles';
-import { Download, RefreshCw, AlertCircle } from 'lucide-react';
+import { Download, RefreshCw, AlertCircle, GripVertical } from 'lucide-react';
 import { AiAligner } from './components/AiAligner';
 import { __ } from './utils/i18n';
 import logoIcon from './assets/delta-scribe-icon.svg';
@@ -51,6 +52,103 @@ function App() {
   const [remoteLoadError, setRemoteLoadError] = useState<string | null>(null);
   const [submitUrl, setSubmitUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Draggable Column Resizer state
+  const [leftColumnWidth, setLeftColumnWidth] = useState(400);
+  const [isResizing, setIsResizing] = useState(false);
+
+  const handleMouseDownResizer = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  };
+
+  useEffect(() => {
+    if (!isResizing) return;
+    const handleMouseMove = (e: MouseEvent) => {
+      const newWidth = Math.max(280, Math.min(850, e.clientX - 24));
+      setLeftColumnWidth(newWidth);
+    };
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
+
+  // Audit Log & Undo / Redo History Stack
+  const [historyStack, setHistoryStack] = useState<{ tracks: typeof subtitleTracks; description: string }[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
+
+  const pushHistoryState = useCallback((newTracks: typeof subtitleTracks, description: string, actionType: AuditLogEntry['actionType']) => {
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const newEntry: AuditLogEntry = {
+      id: generateId(),
+      timestamp,
+      description,
+      actionType,
+    };
+
+    console.log('📜 [DeltaScribe Audit Log]', `${timestamp} [${actionType.toUpperCase()}] ${description}`, newEntry);
+
+    setAuditLog(prev => [...prev, newEntry]);
+    setHistoryStack(prev => {
+      const sliced = prev.slice(0, historyIndex + 1);
+      return [...sliced, { tracks: newTracks, description }];
+    });
+    setHistoryIndex(prev => prev + 1);
+  }, [historyIndex]);
+
+  const handleUndo = useCallback(() => {
+    if (historyIndex > 0) {
+      const targetIndex = historyIndex - 1;
+      setSubtitleTracks(historyStack[targetIndex].tracks);
+      setHistoryIndex(targetIndex);
+      console.log('↩️ [DeltaScribe Audit Log] Undo performed to step:', historyStack[targetIndex].description);
+    } else if (historyIndex === 0) {
+      setHistoryIndex(-1);
+      console.log('↩️ [DeltaScribe Audit Log] Undo performed to initial state');
+    }
+  }, [historyIndex, historyStack]);
+
+  const handleRedo = useCallback(() => {
+    if (historyIndex < historyStack.length - 1) {
+      const targetIndex = historyIndex + 1;
+      setSubtitleTracks(historyStack[targetIndex].tracks);
+      setHistoryIndex(targetIndex);
+      console.log('↪️ [DeltaScribe Audit Log] Redo performed to step:', historyStack[targetIndex].description);
+    }
+  }, [historyIndex, historyStack]);
+
+  // Listen for Cmd+Z / Ctrl+Z (Undo) and Cmd+Shift+Z / Ctrl+Y (Redo)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isInputFocused) return;
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.getAttribute('contenteditable') === 'true')) {
+        return;
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          handleRedo();
+        } else {
+          handleUndo();
+        }
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isInputFocused, handleUndo, handleRedo]);
 
   // When an embedding site provides a `?format=` param, the export format is
   // locked to it (dropdown disabled) so the receiving `submit` endpoint can
@@ -342,7 +440,8 @@ function App() {
     });
 
     setSelectedCueId(newId);
-  }, [setActiveCues]);
+    pushHistoryState(subtitleTracks, position === 'before' ? `Inserted cue before selected` : `Added new cue`, 'add');
+  }, [setActiveCues, pushHistoryState, subtitleTracks]);
 
   const handleValidateOrder = useCallback((id: string) => {
     setActiveCues((prevCues) => {
@@ -573,7 +672,9 @@ function App() {
       
       return reindexed;
     });
-  }, [setActiveCues]);
+    const deletedCue = cues.find(c => c.id === id);
+    pushHistoryState(subtitleTracks, `Deleted Cue #${deletedCue?.index || ''}`, 'delete');
+  }, [setActiveCues, cues, pushHistoryState, subtitleTracks]);
 
   const handleUpdateMultipleCueTimings = useCallback((updates: { id: string; startTime: number; endTime: number }[]) => {
     setActiveCues((prevCues) => {
@@ -899,7 +1000,10 @@ function App() {
         </div>
       </header>
 
-      <main className="dashboard-grid">
+      <main 
+        className="dashboard-grid"
+        style={mediaFile && isWorkspaceReady ? { gridTemplateColumns: `${leftColumnWidth}px 12px 1fr` } : undefined}
+      >
         {!(mediaFile && isWorkspaceReady) ? (
           <div style={{ gridColumn: '1 / -1' }}>
             <FileDropZone
@@ -934,6 +1038,9 @@ function App() {
                 duration={duration}
                 isPlaying={isPlaying}
                 activeCue={activeCue}
+                cues={cues}
+                selectedCueId={selectedCueId}
+                onSelectCue={setSelectedCueId}
                 playerRef={playerRef}
                 onTimeUpdate={setCurrentTime}
                 onDurationChange={setDuration}
@@ -987,6 +1094,15 @@ function App() {
               )}
             </div>
 
+            {/* Draggable Resizer Bar */}
+            <div
+              className={`workspace-resizer-handle ${isResizing ? 'resizing' : ''}`}
+              onMouseDown={handleMouseDownResizer}
+              title="Drag to resize Media and Captions columns"
+            >
+              <GripVertical size={14} className="resizer-icon" />
+            </div>
+
             {/* Right Column: Cue timing list */}
             <div>
               <SubtitleEditor
@@ -1021,6 +1137,17 @@ function App() {
           </>
         )}
       </main>
+
+      {mediaFile && isWorkspaceReady && (
+        <AuditLogDrawer
+          entries={auditLog}
+          currentHistoryIndex={historyIndex}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          canUndo={historyIndex >= 0}
+          canRedo={historyIndex < historyStack.length - 1}
+        />
+      )}
 
       <footer className="app-footer">
         <p>

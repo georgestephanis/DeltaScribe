@@ -105,7 +105,7 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-  const [autoSeek, setAutoSeek] = useState(true);
+  const [autoSeek, setAutoSeek] = useState(false);
   const [leadIn, setLeadIn] = useState(true);
   const listContainerRef = useRef<HTMLDivElement>(null);
   

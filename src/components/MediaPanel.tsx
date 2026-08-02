@@ -8,6 +8,9 @@ interface MediaPanelProps {
   duration: number;
   isPlaying: boolean;
   activeCue: SubtitleCue | null;
+  cues?: SubtitleCue[];
+  selectedCueId?: string | null;
+  onSelectCue?: (id: string) => void;
   playerRef: React.RefObject<HTMLMediaElement | null>;
   onTimeUpdate: (time: number) => void;
   onDurationChange: (duration: number) => void;
@@ -20,6 +23,9 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
   duration,
   isPlaying,
   activeCue,
+  cues = [],
+  selectedCueId = null,
+  onSelectCue,
   playerRef,
   onTimeUpdate,
   onDurationChange,
@@ -349,8 +355,22 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
     onTimeUpdate(value);
   };
 
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    const player = playerRef.current;
+    if (!canvas || !player || !duration) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickPercent = Math.max(0, Math.min(1, clickX / rect.width));
+    const newTime = clickPercent * duration;
+
+    player.currentTime = newTime;
+    onTimeUpdate(newTime);
+  };
+
   return (
-    <div className="media-panel card">
+    <div className="panel media-panel">
       <div className="player-container">
         {isAudio ? (
           <div className="audio-visualizer-container">
@@ -379,7 +399,7 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
                 <button
                   onClick={() => setVisualizerMode('spectrum')}
                   className={`visualizer-toggle-btn ${visualizerMode === 'spectrum' ? 'active' : ''}`}
-                  title="Frequency Spectrum"
+                  title="FFT Frequency Spectrum"
                   type="button"
                 >
                   <BarChart3 size={14} />
@@ -397,7 +417,12 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
               </div>
 
               <div className="canvas-container">
-                <canvas ref={canvasRef} className="audio-visualizer-canvas" />
+                <canvas
+                  ref={canvasRef}
+                  className="audio-visualizer-canvas interactive-canvas"
+                  onClick={handleCanvasClick}
+                  title="Click anywhere on the visualizer to seek media playhead"
+                />
                 {corsError && (
                   <div className="cors-warning-overlay">
                     <span>⚠️ Visualizer disabled (Remote host missing CORS headers)</span>
@@ -452,6 +477,32 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
       <div className="player-controls">
         {/* Scrubber */}
         <div className="scrubber-container">
+          {duration > 0 && cues.length > 0 && (
+            <div className="caption-timeline-track">
+              {cues.map((cue) => {
+                const leftPercent = Math.max(0, Math.min(100, (cue.startTime / duration) * 100));
+                const widthPercent = Math.max(0.2, Math.min(100 - leftPercent, ((cue.endTime - cue.startTime) / duration) * 100));
+                const isCueActive = activeCue?.id === cue.id;
+                const isCueSelected = selectedCueId === cue.id;
+                return (
+                  <div
+                    key={cue.id}
+                    className={`caption-segment ${isCueActive ? 'active' : ''} ${isCueSelected ? 'selected' : ''}`}
+                    style={{ left: `${leftPercent}%`, width: `${widthPercent}%` }}
+                    title={`Cue #${cue.index} (${formatTime(cue.startTime)} - ${formatTime(cue.endTime)}): ${cue.text}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectCue?.(cue.id);
+                      if (playerRef.current) {
+                        playerRef.current.currentTime = cue.startTime;
+                        onTimeUpdate(cue.startTime);
+                      }
+                    }}
+                  />
+                );
+              })}
+            </div>
+          )}
           <input
             type="range"
             min={0}

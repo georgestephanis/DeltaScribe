@@ -8,10 +8,47 @@ This document tracks issues, bug reports, and potential root causes reported dur
 
 ## Resolved Issues
 
-- [x] **Multi-Second Lag on "Ready to Go" Workspace Transition**
-  - **Description**: Clicking the "Ready to Go" button caused a multi-second main-thread lag without visual feedback before the workspace editor rendered.
-  - **Root Cause**: Unmounting `FileDropZone` and mounting `<MediaPanel>` and `<SubtitleEditor>` (which renders all cue card components, calculates offsets, and initializes browser media element audio nodes) occurs synchronously on the main thread. Without a visual loading state or frame deferral, the button appeared frozen.
-  - **Resolution**: Added `isStartingWorkspace` state to `FileDropZone.tsx`, immediately displaying a spinning `<Loader2>` icon ("Starting Workspace...") and disabling the button on click. Used `setTimeout(..., 50)` frame deferral so the DOM repaints the loading indicator before mounting the editor components.
+- [x] **Vertically Stacked Cue Timings & Re-aligned Header Layout**
+  - **Description**: Cue card timing fields currently stretch horizontally, crowding the card header.
+  - **Root Cause**: `SubtitleEditor.tsx` rendered start and end time inputs horizontally side-by-side with an arrow separator (`➔`).
+  - **Resolution**: Restructured cue card headers: cue index badge (`#index` + ▶ play/seek) positioned on the far left, Start and End time input fields stacked vertically in the middle column, and action buttons grouped neatly on the far right.
+
+- [x] **Change History Audit Log Drawer & Undo / Redo System (`Cmd+Z` / `Ctrl+Z`)**
+  - **Description**: Users had no visual change history log or keyboard undo/redo stack for tracking and reverting subtitle edits.
+  - **Root Cause**: State updates directly mutated `subtitleTracks` without recording an undo history stack or rendering an audit log drawer.
+  - **Resolution**: Implemented an undo/redo history state stack (`historyStack`, `historyIndex`) in `App.tsx`, routed structured audit logs through `console.log`, added `Cmd+Z` / `Ctrl+Z` & `Cmd+Shift+Z` hotkeys, and rendered a collapsible bottom `AuditLogDrawer` for real-time history inspection.
+
+- [x] **Prevent Automatic Media Seeking on Subtitle Cue Selection**
+  - **Description**: Clicking a subtitle cue card automatically sought the media player to that cue's timestamp, making it difficult to select a cue and link/sync it to the current playhead position.
+  - **Root Cause**: In `SubtitleEditor.tsx`, `onClick` handler on cue cards called `onSeek(cue.startTime)` whenever `autoSeek` was true (defaulting to `true`).
+  - **Resolution**: Disabled automatic media seeking on cue card selection, defaulting `autoSeek` to `false` and restricting seeking strictly to the explicit ▶ play/seek button on each card header.
+
+- [x] **Draggable Resizable Splitter between Media and Captions Workspace Columns**
+  - **Description**: Column widths between the left media panel and right subtitle editor panel were static percentages without interactive user scaling.
+  - **Root Cause**: In `index.css`, `.dashboard-grid` used fixed column templates without a drag handle.
+  - **Resolution**: Added an interactive draggable splitter handle (`workspace-resizer-handle`) in `App.tsx` and `index.css` allowing users to resize media vs caption panels smoothly.
+
+- [x] **Collapsible Assistant & Helper Panels (AI Aligner & Keyboard Shortcuts)**
+  - **Description**: The AI VTT Sync Assistant and Keyboard Shortcuts helper panels took up vertical space even when not in active use.
+  - **Root Cause**: `AiAligner.tsx` and `KeyboardShortcutsHelp.tsx` rendered continuously without collapse/accordion state controls.
+  - **Resolution**: Added toggle collapse headers (`isCollapsed` state with `ChevronDown` / `ChevronUp` icons) on `AiAligner.tsx` and `KeyboardShortcutsHelp.tsx` so users can expand or hide them at will.
+
+- [x] **Caption Timeline Indicator Bar under Media Scrubber**
+  - **Description**: The media player scrubber bar lacked a visual indication of where subtitle captions exist across the media timeline.
+  - **Root Cause**: `MediaPanel.tsx` only rendered a standard HTML range input without cue segment overlays.
+  - **Resolution**: Passed `cues` and `selectedCueId` to `MediaPanel.tsx`, rendering percentage-positioned colored caption segment blocks (`.caption-segment`) along the scrubber bar with click-to-seek support.
+
+- [x] **Compact Audio Visualizer, Pause Rendering & Interactive Canvas Seeking**
+  - **Description**: Audio visualizer canvas was unnecessarily tall, cleared/froze when media was paused, and could not be clicked to seek.
+  - **Root Cause**: `index.css` allocated large height for `.audio-visualizer-canvas`, `renderVisualizer()` loop stopped on pause, and canvas lacked click handlers.
+  - **Resolution**: Compacted canvas max-height to `120px`, maintained active visualizer rendering when paused, and added `onClick` seek handler on visualizer canvas.
+
+- [x] **Front-Loading Media Pre-loading & Progressive Cue Rendering Optimization**
+  - **Description**: Workspace transition was improved by front-loading media metadata parsing and progressive cue rendering.
+  - **Root Cause**: Media metadata and Web Audio nodes were only created on workspace mount.
+  - **Resolution**: Added pre-loading feedback and frame deferral to `FileDropZone.tsx` and `SubtitleEditor.tsx`.
+
+
 
 
 

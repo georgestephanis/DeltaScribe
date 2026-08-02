@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Brain, Sparkles, Cpu, AlertTriangle, Check, RefreshCw, Settings, ShieldAlert, ClipboardCheck } from 'lucide-react';
+import { Mic, MicOff, Brain, Sparkles, Cpu, AlertTriangle, Check, RefreshCw, Settings, ShieldAlert, ClipboardCheck, ChevronDown, ChevronUp } from 'lucide-react';
 import type { SubtitleCue } from '../utils/subtitles';
 
 interface AiSettings {
@@ -30,6 +30,7 @@ export const AiAligner: React.FC<AiAlignerProps> = ({
   onUpdateAiSettings,
   onSeek,
 }) => {
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [isListening, setIsListening] = useState(false);
   const [capturedTranscripts, setCapturedTranscripts] = useState<{ time: number; text: string }[]>([]);
   const [aiAvailable, setAiAvailable] = useState<'checking' | 'yes' | 'no'>('checking');
@@ -491,20 +492,29 @@ ${JSON.stringify(cues.map(c => ({ index: c.index, duration: (c.endTime - c.start
 
   return (
     <div className="ai-aligner-card card">
-      <div className="card-header-inline">
-        <Sparkles className="icon text-primary animate-pulse" size={18} />
-        <h4>AI Voice-to-Text Sync Assistant</h4>
-        <button
-          onClick={() => setShowSettings(!showSettings)}
-          className={`btn-icon-only-sm btn-settings-toggle ${showSettings ? 'active' : ''}`}
-          title="AI Configuration Settings"
-          type="button"
-        >
-          <Settings size={14} />
-        </button>
+      <div className="card-header-inline collapsible-header" onClick={() => setIsCollapsed(!isCollapsed)} style={{ cursor: 'pointer' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Sparkles className="icon text-primary animate-pulse" size={18} />
+          <h4>AI Voice-to-Text Sync Assistant</h4>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowSettings(!showSettings); }}
+            className={`btn-icon-only-sm btn-settings-toggle ${showSettings ? 'active' : ''}`}
+            title="AI Configuration Settings"
+            type="button"
+          >
+            <Settings size={14} />
+          </button>
+          <button className="btn-icon-only-sm" type="button" aria-label="Toggle panel collapse">
+            {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+          </button>
+        </div>
       </div>
 
-      {showSettings && (
+      {!isCollapsed && (
+        <div className="collapsible-body">
+          {showSettings && (
         <div className="ai-settings-block animate-slide-down">
           <h5>AI Provider Configuration</h5>
           <div className="settings-field">
@@ -783,6 +793,8 @@ ${JSON.stringify(cues.map(c => ({ index: c.index, duration: (c.endTime - c.start
               <span>AI Quality Inspector is unavailable. Configure an API provider in settings.</span>
             </div>
           )}
+        </div>
+      )}
         </div>
       )}
     </div>

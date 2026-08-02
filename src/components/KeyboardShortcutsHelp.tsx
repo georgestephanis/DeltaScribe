@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Keyboard, X, Info } from 'lucide-react';
+import { Keyboard, X, Info, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface KeyboardShortcutsHelpProps {
   variant?: 'modal' | 'inline';
@@ -7,11 +7,14 @@ interface KeyboardShortcutsHelpProps {
 
 export const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({ variant = 'modal' }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
 
   const shortcuts = [
     { key: "Spacebar", action: "Toggle Play / Pause media" },
     { key: "[", action: "Set Start of selected cue to current player time" },
     { key: "]", action: "Set End of selected cue to current player time" },
+    { key: "Cmd + Z / Ctrl + Z", action: "Undo last edit or timing change" },
+    { key: "Cmd + Shift + Z", action: "Redo last undone change" },
     { key: "← / →", action: "Seek backward / forward 5 seconds" },
     { key: "Shift + ← / →", action: "Seek backward / forward 0.5 seconds" },
     { key: "n", action: "Insert new cue at current player position" },
@@ -21,22 +24,35 @@ export const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({ va
   if (variant === 'inline') {
     return (
       <div className="shortcuts-inline-card card">
-        <div className="card-header-inline">
-          <Keyboard className="icon text-primary" size={18} />
-          <h4>Keyboard Timing Shortcuts</h4>
+        <div 
+          className="card-header-inline collapsible-header" 
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          style={{ cursor: 'pointer' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Keyboard className="icon text-primary" size={18} />
+            <h4>Keyboard Timing Shortcuts</h4>
+          </div>
+          <button className="btn-icon-only-sm" type="button" aria-label="Toggle panel collapse">
+            {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+          </button>
         </div>
-        <div className="shortcuts-grid">
-          {shortcuts.map((s, index) => (
-            <div key={index} className="shortcut-grid-item">
-              <kbd className="shortcut-key">{s.key}</kbd>
-              <span className="shortcut-action">{s.action}</span>
+        {!isCollapsed && (
+          <div className="collapsible-body">
+            <div className="shortcuts-grid">
+              {shortcuts.map((s, index) => (
+                <div key={index} className="shortcut-grid-item">
+                  <kbd className="shortcut-key">{s.key}</kbd>
+                  <span className="shortcut-action">{s.action}</span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <div className="shortcut-warning-alert-small">
-          <Info size={12} className="alert-icon" />
-          <p>Keyboard shortcuts are paused while typing inside inputs.</p>
-        </div>
+            <div className="shortcut-warning-alert-small">
+              <Info size={12} className="alert-icon" />
+              <p>Keyboard shortcuts are paused while typing inside inputs.</p>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
