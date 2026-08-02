@@ -185,7 +185,7 @@ textarea::-webkit-scrollbar,
 /* Dashboard Workspace Grid */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
+  grid-template-columns: 1fr 2fr;
   gap: 24px;
   flex-grow: 1;
   min-height: 0; /* Important for flex child scroll */

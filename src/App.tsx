@@ -5,7 +5,7 @@ import { SubtitleEditor } from './components/SubtitleEditor';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { AuditLogDrawer, type AuditLogEntry } from './components/AuditLogDrawer';
 import { parseSRT, formatSRT, formatVTT, formatTTML, type SubtitleCue, interpolateTime } from './utils/subtitles';
-import { Download, RefreshCw, AlertCircle, GripVertical } from 'lucide-react';
+import { Download, RefreshCw, AlertCircle, History } from 'lucide-react';
 import { AiAligner } from './components/AiAligner';
 import { __ } from './utils/i18n';
 import logoIcon from './assets/delta-scribe-icon.svg';
@@ -53,31 +53,8 @@ function App() {
   const [submitUrl, setSubmitUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Draggable Column Resizer state
-  const [leftColumnWidth, setLeftColumnWidth] = useState(400);
-  const [isResizing, setIsResizing] = useState(false);
-
-  const handleMouseDownResizer = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
-  };
-
-  useEffect(() => {
-    if (!isResizing) return;
-    const handleMouseMove = (e: MouseEvent) => {
-      const newWidth = Math.max(280, Math.min(850, e.clientX - 24));
-      setLeftColumnWidth(newWidth);
-    };
-    const handleMouseUp = () => {
-      setIsResizing(false);
-    };
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isResizing]);
+  // History Log drawer display toggle
+  const [showAuditLog, setShowAuditLog] = useState(false);
 
   // Audit Log & Undo / Redo History Stack
   const [historyStack, setHistoryStack] = useState<{ tracks: typeof subtitleTracks; description: string }[]>([]);
@@ -951,10 +928,26 @@ function App() {
         <div className="header-actions-group">
           {!mediaFile && <KeyboardShortcutsHelp />}
           {mediaFile && (
-            <button onClick={handleReset} className="btn btn-secondary btn-sm" type="button">
-              <RefreshCw size={14} />
-              {__('Reset Workspace')}
-            </button>
+            <>
+              <button
+                onClick={() => setShowAuditLog(!showAuditLog)}
+                className={`btn btn-secondary btn-sm ${showAuditLog ? 'active' : ''}`}
+                title="Toggle Change History Log"
+                type="button"
+              >
+                <History size={14} />
+                {__('History Log')}
+                {auditLog.length > 0 && (
+                  <span className="badge badge-history-count" style={{ marginLeft: '4px' }}>
+                    {auditLog.length}
+                  </span>
+                )}
+              </button>
+              <button onClick={handleReset} className="btn btn-secondary btn-sm" type="button">
+                <RefreshCw size={14} />
+                {__('Reset Workspace')}
+              </button>
+            </>
           )}
           {cues.length > 0 && (
             <div className="export-container">
@@ -1000,10 +993,7 @@ function App() {
         </div>
       </header>
 
-      <main 
-        className="dashboard-grid"
-        style={mediaFile && isWorkspaceReady ? { gridTemplateColumns: `${leftColumnWidth}px 12px 1fr` } : undefined}
-      >
+      <main className="dashboard-grid">
         {!(mediaFile && isWorkspaceReady) ? (
           <div style={{ gridColumn: '1 / -1' }}>
             <FileDropZone
@@ -1094,15 +1084,6 @@ function App() {
               )}
             </div>
 
-            {/* Draggable Resizer Bar */}
-            <div
-              className={`workspace-resizer-handle ${isResizing ? 'resizing' : ''}`}
-              onMouseDown={handleMouseDownResizer}
-              title="Drag to resize Media and Captions columns"
-            >
-              <GripVertical size={14} className="resizer-icon" />
-            </div>
-
             {/* Right Column: Cue timing list */}
             <div>
               <SubtitleEditor
@@ -1138,7 +1119,7 @@ function App() {
         )}
       </main>
 
-      {mediaFile && isWorkspaceReady && (
+      {mediaFile && isWorkspaceReady && showAuditLog && (
         <AuditLogDrawer
           entries={auditLog}
           currentHistoryIndex={historyIndex}

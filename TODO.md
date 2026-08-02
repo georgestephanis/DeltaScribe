@@ -8,6 +8,20 @@ This document tracks issues, bug reports, and potential root causes reported dur
 
 ## Resolved Issues
 
+- [x] **Static 1/3 to 2/3 Workspace Column Ratio Allocation**
+  - **Description**: Interactive resizer bar was laggy during dragging; layout now uses a clean 1/3 media side to 2/3 captioning column ratio.
+  - **Root Cause**: Mouse drag listener on `workspace-resizer-handle` triggered continuous main-thread layout recalculations.
+  - **Resolution**: Set `.dashboard-grid` in `index.css` to `grid-template-columns: 1fr 2fr;` (1/3 media side, 2/3 captioning side) and removed drag handle.
+
+- [x] **History Log Toggle Button in Header & Default Hidden Drawer**
+  - **Description**: History log drawer was visible at the bottom of the screen by default without a header toggle button.
+  - **Root Cause**: `<AuditLogDrawer>` rendered continuously at the bottom of the dashboard.
+  - **Resolution**: Added `showAuditLog` state in `App.tsx`, rendered a "History Log" button (`<History size={14} />`) in the top navigation bar next to "Reset Workspace", and hidden the audit log drawer by default unless toggled on.
+
+
+
+## Resolved Issues
+
 - [x] **Vertically Stacked Cue Timings & Re-aligned Header Layout**
   - **Description**: Cue card timing fields currently stretch horizontally, crowding the card header.
   - **Root Cause**: `SubtitleEditor.tsx` rendered start and end time inputs horizontally side-by-side with an arrow separator (`➔`).
