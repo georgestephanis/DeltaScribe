@@ -4,9 +4,29 @@ This document tracks issues, bug reports, and potential root causes reported dur
 
 ## Open Issues
 
-*(No open issues remaining! All reported items have been addressed and verified.)*
+*(None)*
 
 ## Resolved Issues
+
+- [x] **Hotkey Collision within Textarea & Editor**
+  - **Description**: Hitting `[` or `]` when in the text editor would insert those characters into the text box instead of triggering timing latching.
+  - **Root Cause**: The keydown event bubbled to input/contenteditable fields and inserted characters, while global listeners in `App.tsx` were bypassed due to active focus check bypass.
+  - **Resolution**: Intercepted single-keypress `[` and `]` keydown events locally inside `<AutoExpandingTextarea>` and `<RichTextEditor>`, updating the active timing to `currentTime` via `onChangeCue` and using `e.preventDefault()` to stop the character from entering the text box.
+
+- [x] **Linked Duration Timing Shifts (Start Time Updates)**
+  - **Description**: Moving the start time of a cue did not shift its stop time, causing duration changes and timing overlaps.
+  - **Root Cause**: Updates to `startTime` in `handleUpdateCue` mutated only the start time attribute without recalculating the end time based on the active duration.
+  - **Resolution**: Modified `handleUpdateCue` in `App.tsx` to compute the difference and automatically shift the end time by the same delta if only `startTime` is changed, preserving the cue's duration. Stop time modifications continue to only affect the stop point.
+
+- [x] **Glitchy Absolute Timing Input Box Edits**
+  - **Description**: Typing numbers in the absolute start/end timing inputs was glitchy as the input value reformatted to `.toFixed(3)` on every keyup, resetting the cursor and preventing multi-character/decimal inputs.
+  - **Root Cause**: Inputs directly used `value={formatSeconds(cue.startTime)}` controlled by the parent state, re-rendering and overwriting typed text on every character state push.
+  - **Resolution**: Implemented a local `absoluteInputs` state buffer in `SubtitleEditor.tsx` to hold the exact string typed by the user, updating the parent cue state only when parsing a valid float, and clearing the temporary buffer on `blur` or programmatic updates.
+
+- [x] **Lag on Toggling Rich Text & List Scrolling**
+  - **Description**: Toggling the formatting toolbar or Rich Text mode would lag the browser severely when the subtitle list grew large.
+  - **Root Cause**: The app rendered heavy editable text areas, offset badges, and RichTextEditor toolbars for all 100+ subtitle cues at once, overloading the DOM.
+  - **Resolution**: Implemented progressive conditional rendering in `SubtitleEditor.tsx` to render heavy input and editor nodes only for the currently selected cue card (`isSelected === true`). Unselected cards render lightweight static `<span>` and `<div>` layouts. Additionally, applied CSS visibility containment (`content-visibility: auto`) to `.cue-card-wrapper` to optimize browser rendering of off-screen items.
 
 - [x] **Static 1/3 to 2/3 Workspace Column Ratio Allocation**
   - **Description**: Interactive resizer bar was laggy during dragging; layout now uses a clean 1/3 media side to 2/3 captioning column ratio.

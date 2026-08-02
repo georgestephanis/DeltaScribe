@@ -106,7 +106,12 @@ function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isInputFocused) return;
       const activeEl = document.activeElement;
-      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.getAttribute('contenteditable') === 'true')) {
+      if (activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' || 
+        activeEl.getAttribute('contenteditable') === 'true' ||
+        activeEl.closest('[contenteditable="true"]')
+      )) {
         return;
       }
 
@@ -513,6 +518,12 @@ function App() {
             }
           }
 
+          // Keep duration constant if only startTime is updated
+          if (updatedFields.startTime !== undefined && updatedFields.endTime === undefined) {
+            const cueDuration = cue.endTime - cue.startTime;
+            result.endTime = result.startTime + cueDuration;
+          }
+
           // Validations
           if (result.startTime < 0) result.startTime = 0;
           if (result.endTime < result.startTime) {
@@ -876,6 +887,15 @@ function App() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isInputFocused) return; // Skip if user is editing subtitle text or numbers
+      const activeEl = document.activeElement;
+      if (activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' || 
+        activeEl.getAttribute('contenteditable') === 'true' ||
+        activeEl.closest('[contenteditable="true"]')
+      )) {
+        return;
+      }
 
       const player = playerRef.current;
       if (!player) return;

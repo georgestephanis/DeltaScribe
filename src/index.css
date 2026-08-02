@@ -2613,6 +2613,37 @@ textarea::-webkit-scrollbar,
   position: relative;
   display: flex;
   flex-direction: column;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 140px;
+}
+
+/* Read-only / static representations for unselected cue cards */
+.time-field.read-only {
+  background: rgba(0, 0, 0, 0.15);
+  border-color: transparent;
+}
+
+.time-display-value {
+  width: 60px;
+  color: var(--text-main);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  display: inline-block;
+  user-select: none;
+}
+
+.offset-display-value {
+  width: 44px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: center;
+  display: inline-block;
+  user-select: none;
+}
+
+.offset-badge-container.read-only {
+  border-right: none;
 }
 
 .cue-hover-insert-line {

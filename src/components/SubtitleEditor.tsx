@@ -159,7 +159,8 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
     onFocus: () => void;
     onBlur: () => void;
     disabled: boolean;
-  }> = ({ value, onChange, onFocus, onBlur, disabled }) => {
+    onKeyDown?: (e: React.KeyboardEvent<HTMLDivElement>) => void;
+  }> = ({ value, onChange, onFocus, onBlur, disabled, onKeyDown }) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const [isFocused, setIsFocused] = useState(false);
 
@@ -260,6 +261,7 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
             onBlur();
           }}
           onInput={handleInput}
+          onKeyDown={onKeyDown}
           className="rich-editor-content"
           data-placeholder="Enter subtitle text..."
         />
@@ -267,8 +269,9 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
     );
   };
   
-  // Local state to track offset input values while typing
+  // Local state to track offset and absolute input values while typing
   const [offsetInputs, setOffsetInputs] = useState<Record<string, { startTime?: string; endTime?: string }>>({});
+  const [absoluteInputs, setAbsoluteInputs] = useState<Record<string, { startTime?: string; endTime?: string }>>({});
   const [openSettingsCueId, setOpenSettingsCueId] = useState<string | null>(null);
 
   // Find which cue is active at the current playback time
@@ -299,11 +302,39 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
     return sec.toFixed(3);
   };
 
-  const handleTimeChange = (id: string, field: 'startTime' | 'endTime', valueStr: string) => {
-    const value = parseFloat(valueStr);
-    if (!isNaN(value)) {
-      onChangeCue(id, { [field]: value });
+  const getAbsoluteValue = (cueId: string, field: 'startTime' | 'endTime', currentVal: number) => {
+    const typed = absoluteInputs[cueId]?.[field];
+    if (typed !== undefined) return typed;
+    return formatSeconds(currentVal);
+  };
+
+  const handleAbsoluteChange = (id: string, field: 'startTime' | 'endTime', valueStr: string) => {
+    setAbsoluteInputs((prev) => ({
+      ...prev,
+      [id]: {
+        ...prev[id],
+        [field]: valueStr,
+      },
+    }));
+
+    const parsed = parseFloat(valueStr);
+    if (!isNaN(parsed)) {
+      onChangeCue(id, { [field]: parsed });
     }
+  };
+
+  const handleAbsoluteBlur = (id: string, field: 'startTime' | 'endTime') => {
+    onFocusInput(false);
+    onValidateOrder?.(id);
+    setAbsoluteInputs((prev) => {
+      const next = { ...prev };
+      if (next[id]) {
+        const fieldObj = { ...next[id] };
+        delete fieldObj[field];
+        next[id] = fieldObj;
+      }
+      return next;
+    });
   };
 
   const getOffsetValue = (cueId: string, field: 'startTime' | 'endTime', currentVal: number, originalVal: number) => {
@@ -325,11 +356,6 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
     if (!isNaN(parsed)) {
       onChangeCue(id, { [field]: originalVal + parsed });
     }
-  };
-
-  const handleTimeBlur = (id: string) => {
-    onFocusInput(false);
-    onValidateOrder?.(id);
   };
 
   const handleOffsetBlur = (id: string, field: 'startTime' | 'endTime') => {
@@ -638,411 +664,515 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
                 <div
                   id={`cue-card-${cue.id}`}
                   className={`cue-card ${isActive ? 'active-playing' : ''} ${isSelected ? 'selected' : ''} ${isManualAnchor ? 'manual-anchor' : ''} ${isAutoAdjusted ? 'auto-adjusted' : ''}`}
-                onClick={() => {
-                  onSelectCue(cue.id);
-                  if (autoSeek) {
-                    const targetTime = leadIn ? Math.max(0, cue.startTime - 2.0) : cue.startTime;
-                    onSeek(targetTime);
-                  }
-                }}
-              >
-                <div className="cue-header">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div className="cue-index-badge">#{cue.index}</div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const targetTime = leadIn ? Math.max(0, cue.startTime - 2.0) : cue.startTime;
-                        onSeek(targetTime);
-                      }}
-                      className="btn-card-play-seek"
-                      title={`Seek player to ${leadIn ? '2s before ' : ''}start time (${cue.startTime.toFixed(2)}s)`}
-                      type="button"
-                    >
-                      <Play size={10} fill="currentColor" />
-                    </button>
-                    {scalingModeEnabled && (
+                  onClick={() => {
+                    onSelectCue(cue.id);
+                    if (autoSeek) {
+                      const targetTime = leadIn ? Math.max(0, cue.startTime - 2.0) : cue.startTime;
+                      onSeek(targetTime);
+                    }
+                  }}
+                >
+                  <div className="cue-header">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div className="cue-index-badge">#{cue.index}</div>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onChangeCue(cue.id, { isAnchor: !cue.isAnchor });
+                          const targetTime = leadIn ? Math.max(0, cue.startTime - 2.0) : cue.startTime;
+                          onSeek(targetTime);
                         }}
-                        className={`btn-anchor-toggle ${cue.isAnchor ? 'active' : ''}`}
-                        title={cue.isAnchor ? "Remove timing anchor (recalculate timing)" : "Set timing anchor"}
+                        className="btn-card-play-seek"
+                        title={`Seek player to ${leadIn ? '2s before ' : ''}start time (${cue.startTime.toFixed(2)}s)`}
                         type="button"
                       >
-                        <Anchor size={12} />
+                        <Play size={10} fill="currentColor" />
                       </button>
-                    )}
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {isManualAnchor && (
-                      <span className="badge badge-anchor" title="Manually anchored timing">
-                        <Anchor size={10} />
-                        Anchor
-                      </span>
-                    )}
-                    {isAutoAdjusted && (
-                      <span className="badge badge-auto" title="Automatically adjusted timing via scaling">
-                        Auto
-                      </span>
-                    )}
-                  </div>
-                  
-                  <div className="cue-timing">
-                    <div className="time-field">
-                      <label>Start</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={formatSeconds(cue.startTime)}
-                        onChange={(e) => handleTimeChange(cue.id, 'startTime', e.target.value)}
-                        onFocus={() => onFocusInput(true)}
-                        onBlur={() => handleTimeBlur(cue.id)}
-                        className="time-input-box"
-                      />
-
-                      {cue.originalStartTime !== undefined && (
-                        <div className={`offset-badge-container ${isManualAnchor ? 'manual-anchor-offset' : ''} ${isAutoAdjusted ? 'auto-adjusted-offset' : ''}`}>
-                          <span className="offset-symbol">Δ</span>
-                          <input
-                            type="text"
-                            value={getOffsetValue(cue.id, 'startTime', cue.startTime, cue.originalStartTime)}
-                            onChange={(e) => handleOffsetChange(cue.id, 'startTime', cue.originalStartTime!, e.target.value)}
-                            onFocus={() => onFocusInput(true)}
-                            onBlur={() => handleOffsetBlur(cue.id, 'startTime')}
-                            className="offset-input-box"
-                            title="Start time offset from original anchor (seconds)"
-                          />
-                          {cue.startTime !== cue.originalStartTime && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onChangeCue(cue.id, { startTime: cue.originalStartTime });
-                                setOffsetInputs((prev) => {
-                                  const next = { ...prev };
-                                  if (next[cue.id]) {
-                                    const f = { ...next[cue.id] };
-                                    delete f.startTime;
-                                    next[cue.id] = f;
-                                  }
-                                  return next;
-                                });
-                              }}
-                              className="btn-reset-offset"
-                              title="Reset start time to original anchor"
-                              type="button"
-                            >
-                              <RotateCcw size={10} />
-                            </button>
-                          )}
-                        </div>
+                      {scalingModeEnabled && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onChangeCue(cue.id, { isAnchor: !cue.isAnchor });
+                          }}
+                          className={`btn-anchor-toggle ${cue.isAnchor ? 'active' : ''}`}
+                          title={cue.isAnchor ? "Remove timing anchor (recalculate timing)" : "Set timing anchor"}
+                          type="button"
+                        >
+                          <Anchor size={12} />
+                        </button>
                       )}
-
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onChangeCue(cue.id, { startTime: currentTime }); }}
-                        className="btn-sync-time"
-                        title="Sync start to current video position (Keyboard shortcut: '[')"
-                        type="button"
-                      >
-                        [
-                      </button>
                     </div>
 
-                    <div className="timing-arrow">➔</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {isManualAnchor && (
+                        <span className="badge badge-anchor" title="Manually anchored timing">
+                          <Anchor size={10} />
+                          Anchor
+                        </span>
+                      )}
+                      {isAutoAdjusted && (
+                        <span className="badge badge-auto" title="Automatically adjusted timing via scaling">
+                          Auto
+                        </span>
+                      )}
+                    </div>
 
-                    <div className={`time-field ${isOverlapping ? 'overlap-warning-border' : ''}`}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        End
-                        {isOverlapping && (
-                          <span className="overlap-warning-text" title={`Overlaps with Cue #${nextCue.index}`}>
-                            ⚠️ Overlaps #{nextCue.index}
-                          </span>
-                        )}
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={formatSeconds(cue.endTime)}
-                        onChange={(e) => handleTimeChange(cue.id, 'endTime', e.target.value)}
-                        onFocus={() => onFocusInput(true)}
-                        onBlur={() => handleTimeBlur(cue.id)}
-                        className="time-input-box"
-                      />
-
-                      {cue.originalEndTime !== undefined && (
-                        <div className={`offset-badge-container ${isManualAnchor ? 'manual-anchor-offset' : ''} ${isAutoAdjusted ? 'auto-adjusted-offset' : ''}`}>
-                          <span className="offset-symbol">Δ</span>
+                    <div className="cue-timing">
+                      {isSelected ? (
+                        <div className="time-field">
+                          <label>Start</label>
                           <input
                             type="text"
-                            value={getOffsetValue(cue.id, 'endTime', cue.endTime, cue.originalEndTime)}
-                            onChange={(e) => handleOffsetChange(cue.id, 'endTime', cue.originalEndTime!, e.target.value)}
+                            value={getAbsoluteValue(cue.id, 'startTime', cue.startTime)}
+                            onChange={(e) => handleAbsoluteChange(cue.id, 'startTime', e.target.value)}
                             onFocus={() => onFocusInput(true)}
-                            onBlur={() => handleOffsetBlur(cue.id, 'endTime')}
-                            className="offset-input-box"
-                            title="End time offset from original anchor (seconds)"
+                            onBlur={() => handleAbsoluteBlur(cue.id, 'startTime')}
+                            className="time-input-box"
                           />
-                          {cue.endTime !== cue.originalEndTime && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onChangeCue(cue.id, { endTime: cue.originalEndTime });
-                                setOffsetInputs((prev) => {
-                                  const next = { ...prev };
-                                  if (next[cue.id]) {
-                                    const f = { ...next[cue.id] };
-                                    delete f.endTime;
-                                    next[cue.id] = f;
-                                  }
-                                  return next;
-                                });
-                              }}
-                              className="btn-reset-offset"
-                              title="Reset end time to original anchor"
-                              type="button"
-                            >
-                              <RotateCcw size={10} />
-                            </button>
-                          )}
-                        </div>
-                      )}
 
-                      {isSelected && (
-                        <div className="end-adjust-group">
+                          {cue.originalStartTime !== undefined && (
+                            <div className={`offset-badge-container ${isManualAnchor ? 'manual-anchor-offset' : ''} ${isAutoAdjusted ? 'auto-adjusted-offset' : ''}`}>
+                              <span className="offset-symbol">Δ</span>
+                              <input
+                                type="text"
+                                value={getOffsetValue(cue.id, 'startTime', cue.startTime, cue.originalStartTime)}
+                                onChange={(e) => handleOffsetChange(cue.id, 'startTime', cue.originalStartTime!, e.target.value)}
+                                onFocus={() => onFocusInput(true)}
+                                onBlur={() => handleOffsetBlur(cue.id, 'startTime')}
+                                className="offset-input-box"
+                                title="Start time offset from original anchor (seconds)"
+                              />
+                              {cue.startTime !== cue.originalStartTime && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onChangeCue(cue.id, { startTime: cue.originalStartTime });
+                                    setAbsoluteInputs((prev) => {
+                                      const next = { ...prev };
+                                      if (next[cue.id]) {
+                                        const f = { ...next[cue.id] };
+                                        delete f.startTime;
+                                        next[cue.id] = f;
+                                      }
+                                      return next;
+                                    });
+                                    setOffsetInputs((prev) => {
+                                      const next = { ...prev };
+                                      if (next[cue.id]) {
+                                        const f = { ...next[cue.id] };
+                                        delete f.startTime;
+                                        next[cue.id] = f;
+                                      }
+                                      return next;
+                                    });
+                                  }}
+                                  className="btn-reset-offset"
+                                  title="Reset start time to original anchor"
+                                  type="button"
+                                >
+                                  <RotateCcw size={10} />
+                                </button>
+                              )}
+                            </div>
+                          )}
+
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              onChangeCue(cue.id, { endTime: Math.max(cue.startTime + 0.1, cue.endTime - 0.5) });
+                              onChangeCue(cue.id, { startTime: currentTime });
+                              setAbsoluteInputs((prev) => {
+                                const next = { ...prev };
+                                if (next[cue.id]) {
+                                  const f = { ...next[cue.id] };
+                                  delete f.startTime;
+                                  next[cue.id] = f;
+                                }
+                                return next;
+                              });
                             }}
-                            className="btn-adjust"
-                            title="Reduce duration by 0.5s"
+                            className="btn-sync-time"
+                            title="Sync start to current video position (Keyboard shortcut: '[')"
                             type="button"
                           >
-                            -0.5s
+                            [
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="time-field read-only">
+                          <label>Start</label>
+                          <span className="time-display-value">{formatSeconds(cue.startTime)}s</span>
+                          {cue.originalStartTime !== undefined && (
+                            <div className={`offset-badge-container read-only ${isManualAnchor ? 'manual-anchor-offset' : ''} ${isAutoAdjusted ? 'auto-adjusted-offset' : ''}`}>
+                              <span className="offset-symbol">Δ</span>
+                              <span className="offset-display-value">
+                                {(cue.startTime - cue.originalStartTime) >= 0 ? '+' : ''}{(cue.startTime - cue.originalStartTime).toFixed(2)}s
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="timing-arrow">➔</div>
+
+                      {isSelected ? (
+                        <div className={`time-field ${isOverlapping ? 'overlap-warning-border' : ''}`}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            End
+                            {isOverlapping && (
+                              <span className="overlap-warning-text" title={`Overlaps with Cue #${nextCue.index}`}>
+                                ⚠️ Overlaps #{nextCue.index}
+                              </span>
+                            )}
+                          </label>
+                          <input
+                            type="text"
+                            value={getAbsoluteValue(cue.id, 'endTime', cue.endTime)}
+                            onChange={(e) => handleAbsoluteChange(cue.id, 'endTime', e.target.value)}
+                            onFocus={() => onFocusInput(true)}
+                            onBlur={() => handleAbsoluteBlur(cue.id, 'endTime')}
+                            className="time-input-box"
+                          />
+
+                          {cue.originalEndTime !== undefined && (
+                            <div className={`offset-badge-container ${isManualAnchor ? 'manual-anchor-offset' : ''} ${isAutoAdjusted ? 'auto-adjusted-offset' : ''}`}>
+                              <span className="offset-symbol">Δ</span>
+                              <input
+                                type="text"
+                                value={getOffsetValue(cue.id, 'endTime', cue.endTime, cue.originalEndTime)}
+                                onChange={(e) => handleOffsetChange(cue.id, 'endTime', cue.originalEndTime!, e.target.value)}
+                                onFocus={() => onFocusInput(true)}
+                                onBlur={() => handleOffsetBlur(cue.id, 'endTime')}
+                                className="offset-input-box"
+                                title="End time offset from original anchor (seconds)"
+                              />
+                              {cue.endTime !== cue.originalEndTime && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onChangeCue(cue.id, { endTime: cue.originalEndTime });
+                                    setAbsoluteInputs((prev) => {
+                                      const next = { ...prev };
+                                      if (next[cue.id]) {
+                                        const f = { ...next[cue.id] };
+                                        delete f.endTime;
+                                        next[cue.id] = f;
+                                      }
+                                      return next;
+                                    });
+                                    setOffsetInputs((prev) => {
+                                      const next = { ...prev };
+                                      if (next[cue.id]) {
+                                        const f = { ...next[cue.id] };
+                                        delete f.endTime;
+                                        next[cue.id] = f;
+                                      }
+                                      return next;
+                                    });
+                                  }}
+                                  className="btn-reset-offset"
+                                  title="Reset end time to original anchor"
+                                  type="button"
+                                >
+                                  <RotateCcw size={10} />
+                                </button>
+                              )}
+                            </div>
+                          )}
+
+                          <div className="end-adjust-group">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onChangeCue(cue.id, { endTime: Math.max(cue.startTime + 0.1, cue.endTime - 0.5) });
+                              }}
+                              className="btn-adjust"
+                              title="Reduce duration by 0.5s"
+                              type="button"
+                            >
+                              -0.5s
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onChangeCue(cue.id, { endTime: cue.endTime + 0.5 });
+                              }}
+                              className="btn-adjust"
+                              title="Extend duration by 0.5s"
+                              type="button"
+                            >
+                              +0.5s
+                            </button>
+                            {nextCue && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onChangeCue(cue.id, { endTime: nextCue.startTime });
+                                }}
+                                className="btn-adjust btn-adjust-stretch"
+                                title={`Stretch end to start of next subtitle (Cue #${nextCue.index})`}
+                                type="button"
+                              >
+                                Stretch to Next
+                              </button>
+                            )}
+                          </div>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onChangeCue(cue.id, { endTime: currentTime });
+                              setAbsoluteInputs((prev) => {
+                                const next = { ...prev };
+                                if (next[cue.id]) {
+                                  const f = { ...next[cue.id] };
+                                  delete f.endTime;
+                                  next[cue.id] = f;
+                                }
+                                return next;
+                              });
+                            }}
+                            className="btn-sync-time"
+                            title="Sync end to current video position (Keyboard shortcut: ']')"
+                            type="button"
+                          >
+                            ]
+                          </button>
+                        </div>
+                      ) : (
+                        <div className={`time-field read-only ${isOverlapping ? 'overlap-warning-border' : ''}`}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            End
+                            {isOverlapping && (
+                              <span className="overlap-warning-text" title={`Overlaps with Cue #${nextCue.index}`}>
+                                ⚠️ Overlaps #{nextCue.index}
+                              </span>
+                            )}
+                          </label>
+                          <span className="time-display-value">{formatSeconds(cue.endTime)}s</span>
+                          {cue.originalEndTime !== undefined && (
+                            <div className={`offset-badge-container read-only ${isManualAnchor ? 'manual-anchor-offset' : ''} ${isAutoAdjusted ? 'auto-adjusted-offset' : ''}`}>
+                              <span className="offset-symbol">Δ</span>
+                              <span className="offset-display-value">
+                                {(cue.endTime - cue.originalEndTime) >= 0 ? '+' : ''}{(cue.endTime - cue.originalEndTime).toFixed(2)}s
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="cue-actions">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onSeek(cue.startTime); }}
+                        className="btn-icon-only-sm"
+                        title="Jump player to start of cue"
+                        type="button"
+                      >
+                        <FastForward size={14} />
+                      </button>
+                      {enableAlignment && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenSettingsCueId(openSettingsCueId === cue.id ? null : cue.id);
+                          }}
+                          className={`btn-icon-only-sm ${openSettingsCueId === cue.id ? 'active' : ''}`}
+                          title="Adjust alignment and line placement"
+                          type="button"
+                        >
+                          <Settings size={14} />
+                        </button>
+                      )}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onSplitCue(cue.id); }}
+                        className="btn-icon-only-sm"
+                        title="Split subtitle into two chunks"
+                        type="button"
+                      >
+                        <Scissors size={14} />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onAddCue(cue.id, 'before'); }}
+                        className="btn-icon-only-sm"
+                        title="Insert cue before this"
+                        type="button"
+                      >
+                        <span className="btn-badge-sub">↑</span>
+                        <Plus size={12} />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onAddCue(cue.id, 'after'); }}
+                        className="btn-icon-only-sm"
+                        title="Insert cue after this"
+                        type="button"
+                      >
+                        <Plus size={12} />
+                        <span className="btn-badge-sub">↓</span>
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onDeleteCue(cue.id); }}
+                        className="btn-icon-only-sm danger"
+                        title="Delete cue"
+                        type="button"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {openSettingsCueId === cue.id && (
+                    <div className="cue-settings-drawer">
+                      <div className="settings-group">
+                        <span className="settings-label">Alignment:</span>
+                        <div className="btn-group">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onChangeCue(cue.id, { align: 'left' });
+                            }}
+                            className={`btn-toggle-sm ${cue.align === 'left' ? 'active' : ''}`}
+                            title="Align Left"
+                            type="button"
+                          >
+                            <AlignLeft size={12} />
                           </button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              onChangeCue(cue.id, { endTime: cue.endTime + 0.5 });
+                              onChangeCue(cue.id, { align: 'center' });
                             }}
-                            className="btn-adjust"
-                            title="Extend duration by 0.5s"
+                            className={`btn-toggle-sm ${cue.align === 'center' || !cue.align ? 'active' : ''}`}
+                            title="Align Center"
                             type="button"
                           >
-                            +0.5s
+                            <AlignCenter size={12} />
                           </button>
-                          {nextCue && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onChangeCue(cue.id, { endTime: nextCue.startTime });
-                              }}
-                              className="btn-adjust btn-adjust-stretch"
-                              title={`Stretch end to start of next subtitle (Cue #${nextCue.index})`}
-                              type="button"
-                            >
-                              Stretch to Next
-                            </button>
-                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onChangeCue(cue.id, { align: 'right' });
+                            }}
+                            className={`btn-toggle-sm ${cue.align === 'right' ? 'active' : ''}`}
+                            title="Align Right"
+                            type="button"
+                          >
+                            <AlignRight size={12} />
+                          </button>
                         </div>
-                      )}
+                      </div>
 
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onChangeCue(cue.id, { endTime: currentTime }); }}
-                        className="btn-sync-time"
-                        title="Sync end to current video position (Keyboard shortcut: ']')"
-                        type="button"
-                      >
-                        ]
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="cue-actions">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onSeek(cue.startTime); }}
-                      className="btn-icon-only-sm"
-                      title="Jump player to start of cue"
-                      type="button"
-                    >
-                      <FastForward size={14} />
-                    </button>
-                    {enableAlignment && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenSettingsCueId(openSettingsCueId === cue.id ? null : cue.id);
-                        }}
-                        className={`btn-icon-only-sm ${openSettingsCueId === cue.id ? 'active' : ''}`}
-                        title="Adjust alignment and line placement"
-                        type="button"
-                      >
-                        <Settings size={14} />
-                      </button>
-                    )}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onSplitCue(cue.id); }}
-                      className="btn-icon-only-sm"
-                      title="Split subtitle into two chunks"
-                      type="button"
-                    >
-                      <Scissors size={14} />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onAddCue(cue.id, 'before'); }}
-                      className="btn-icon-only-sm"
-                      title="Insert cue before this"
-                      type="button"
-                    >
-                      <span className="btn-badge-sub">↑</span>
-                      <Plus size={12} />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onAddCue(cue.id, 'after'); }}
-                      className="btn-icon-only-sm"
-                      title="Insert cue after this"
-                      type="button"
-                    >
-                      <Plus size={12} />
-                      <span className="btn-badge-sub">↓</span>
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onDeleteCue(cue.id); }}
-                      className="btn-icon-only-sm danger"
-                      title="Delete cue"
-                      type="button"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-
-                {openSettingsCueId === cue.id && (
-                  <div className="cue-settings-drawer">
-                    <div className="settings-group">
-                      <span className="settings-label">Alignment:</span>
-                      <div className="btn-group">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onChangeCue(cue.id, { align: 'left' });
+                      <div className="settings-group">
+                        <span className="settings-label">Position:</span>
+                        <select
+                          value={cue.line || 'auto'}
+                          onChange={(e) => {
+                            onChangeCue(cue.id, { line: e.target.value === 'auto' ? undefined : e.target.value });
                           }}
-                          className={`btn-toggle-sm ${cue.align === 'left' ? 'active' : ''}`}
-                          title="Align Left"
-                          type="button"
+                          onClick={(e) => e.stopPropagation()}
+                          className="select-position-sm"
+                          aria-label="Text vertical position placement"
                         >
-                          <AlignLeft size={12} />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onChangeCue(cue.id, { align: 'center' });
-                          }}
-                          className={`btn-toggle-sm ${cue.align === 'center' || !cue.align ? 'active' : ''}`}
-                          title="Align Center"
-                          type="button"
-                        >
-                          <AlignCenter size={12} />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onChangeCue(cue.id, { align: 'right' });
-                          }}
-                          className={`btn-toggle-sm ${cue.align === 'right' ? 'active' : ''}`}
-                          title="Align Right"
-                          type="button"
-                        >
-                          <AlignRight size={12} />
-                        </button>
+                          <option value="auto">Auto (Bottom)</option>
+                          <option value="10%">Top (10%)</option>
+                          <option value="30%">Upper Third (30%)</option>
+                          <option value="50%">Middle (50%)</option>
+                          <option value="70%">Lower Third (70%)</option>
+                          <option value="90%">Bottom (90%)</option>
+                        </select>
                       </div>
                     </div>
-
-                    <div className="settings-group">
-                      <span className="settings-label">Position:</span>
-                      <select
-                        value={cue.line || 'auto'}
-                        onChange={(e) => {
-                          onChangeCue(cue.id, { line: e.target.value === 'auto' ? undefined : e.target.value });
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="select-position-sm"
-                        aria-label="Text vertical position placement"
-                      >
-                        <option value="auto">Auto (Bottom)</option>
-                        <option value="10%">Top (10%)</option>
-                        <option value="30%">Upper Third (30%)</option>
-                        <option value="50%">Middle (50%)</option>
-                        <option value="70%">Lower Third (70%)</option>
-                        <option value="90%">Bottom (90%)</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
-
-                <div className="cue-body">
-                  {enableFormatting ? (
-                    <RichTextEditor
-                      value={cue.text}
-                      onChange={(text) => onChangeCue(cue.id, { text })}
-                      onFocus={() => {
-                        onSelectCue(cue.id);
-                        if (isTextEditable) {
-                          onFocusInput(true);
-                        }
-                      }}
-                      onBlur={() => onFocusInput(false)}
-                      disabled={!isTextEditable}
-                    />
-                  ) : (
-                    <AutoExpandingTextarea
-                      value={cue.text}
-                      onChange={(e) => onChangeCue(cue.id, { text: e.target.value })}
-                      placeholder={isTextEditable ? "Enter subtitle text..." : "Text is locked (read-only)"}
-                      className="cue-text-area"
-                      readOnly={!isTextEditable}
-                      onFocus={() => {
-                        onSelectCue(cue.id);
-                        if (isTextEditable) {
-                          onFocusInput(true);
-                        }
-                      }}
-                      onBlur={() => onFocusInput(false)}
-                    />
                   )}
-                  {(() => {
-                    const refCue = referenceCues.find(rc => rc.index === cue.index);
-                    if (refCue) {
-                      return (
-                        <div className="reference-cue-box">
-                          <div className="reference-header">
-                            <span className="reference-label">Reference #{refCue.index}</span>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onCopyReferenceTiming(cue.id, refCue.startTime, refCue.endTime);
-                              }}
-                              className="btn-copy-timing"
-                              title="Copy reference timings to this cue"
-                              type="button"
-                            >
-                              <Copy size={11} />
-                              Sync Timing
-                            </button>
-                          </div>
-                          <p className="reference-text">{refCue.text}</p>
+
+                  <div className="cue-body">
+                    {isSelected ? (
+                      enableFormatting ? (
+                        <RichTextEditor
+                          value={cue.text}
+                          onChange={(text) => onChangeCue(cue.id, { text })}
+                          onFocus={() => {
+                            onSelectCue(cue.id);
+                            if (isTextEditable) {
+                              onFocusInput(true);
+                            }
+                          }}
+                          onBlur={() => onFocusInput(false)}
+                          disabled={!isTextEditable}
+                          onKeyDown={(e) => {
+                            if ((e.key === '[' || e.key === ']') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                              e.preventDefault();
+                              const val = e.key === '[' ? { startTime: currentTime } : { endTime: currentTime };
+                              onChangeCue(cue.id, val);
+                            }
+                          }}
+                        />
+                      ) : (
+                        <AutoExpandingTextarea
+                          value={cue.text}
+                          onChange={(e) => onChangeCue(cue.id, { text: e.target.value })}
+                          placeholder={isTextEditable ? "Enter subtitle text..." : "Text is locked (read-only)"}
+                          className="cue-text-area"
+                          readOnly={!isTextEditable}
+                          onFocus={() => {
+                            onSelectCue(cue.id);
+                            if (isTextEditable) {
+                              onFocusInput(true);
+                            }
+                          }}
+                          onBlur={() => onFocusInput(false)}
+                          onKeyDown={(e) => {
+                            if ((e.key === '[' || e.key === ']') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                              e.preventDefault();
+                              const val = e.key === '[' ? { startTime: currentTime } : { endTime: currentTime };
+                              onChangeCue(cue.id, val);
+                            }
+                          }}
+                        />
+                      )
+                    ) : (
+                      enableFormatting ? (
+                        <div
+                          className="cue-text-display html-content rich-editor-content"
+                          style={{ cursor: 'default', minHeight: 'auto', border: '1px solid transparent', background: 'rgba(0, 0, 0, 0.12)', color: 'var(--text-secondary)' }}
+                          dangerouslySetInnerHTML={{ __html: subtitlesToHtml(cue.text) }}
+                        />
+                      ) : (
+                        <div
+                          className="cue-text-display plain-text cue-text-area"
+                          style={{ cursor: 'default', overflow: 'hidden', height: 'auto', border: '1px solid transparent', background: 'rgba(0, 0, 0, 0.12)', color: 'var(--text-secondary)', resize: 'none' }}
+                        >
+                          {cue.text || <span className="placeholder-text" style={{ color: 'var(--text-muted)' }}>Empty cue text</span>}
                         </div>
-                      );
-                    }
-                    return null;
-                  })()}
+                      )
+                    )}
+                    {(() => {
+                      const refCue = referenceCues.find(rc => rc.index === cue.index);
+                      if (refCue) {
+                        return (
+                          <div className="reference-cue-box">
+                            <div className="reference-header">
+                              <span className="reference-label">Reference #{refCue.index}</span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onCopyReferenceTiming(cue.id, refCue.startTime, refCue.endTime);
+                                }}
+                                className="btn-copy-timing"
+                                title="Copy reference timings to this cue"
+                                type="button"
+                              >
+                                <Copy size={11} />
+                                Sync Timing
+                              </button>
+                            </div>
+                            <p className="reference-text">{refCue.text}</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
                 </div>
               </div>
-            </div>
-          );
+            );
           })
         )}
       </div>
