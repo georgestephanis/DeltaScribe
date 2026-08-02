@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Plus, Trash2, Search, FastForward, SlidersHorizontal, Lock, Unlock, Scissors, RotateCcw, Copy, Settings, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline, Anchor } from 'lucide-react';
+import { Plus, Trash2, Search, FastForward, SlidersHorizontal, Lock, Unlock, Scissors, RotateCcw, Copy, Settings, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline, Anchor, Play } from 'lucide-react';
 import type { SubtitleCue } from '../utils/subtitles';
 
 interface SubtitleEditorProps {
@@ -91,6 +91,9 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [shiftAmount, setShiftAmount] = useState('1.0');
   const [showShiftControls, setShowShiftControls] = useState(false);
+  const [showPlaybackOptions, setShowPlaybackOptions] = useState(false);
+  const [autoSeek, setAutoSeek] = useState(true);
+  const [leadIn, setLeadIn] = useState(true);
   const listContainerRef = useRef<HTMLDivElement>(null);
   
   // Helper functions for contentEditable rich text editing
@@ -421,8 +424,43 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
           >
             <SlidersHorizontal size={16} />
           </button>
+
+          {/* Toggle Playback Options helper */}
+          <button
+            onClick={() => setShowPlaybackOptions(!showPlaybackOptions)}
+            className={`btn btn-sm btn-icon-only ${showPlaybackOptions ? 'active' : ''}`}
+            title="Playback sync & seek settings"
+            type="button"
+          >
+            <Play size={16} />
+          </button>
         </div>
       </div>
+
+      {showPlaybackOptions && (
+        <div className="shift-helper-panel animate-slide-down">
+          <span className="helper-label">Playback Auto-Seek Options:</span>
+          <div className="shift-row" style={{ gap: '16px' }}>
+            <label className="checkbox-label" title="Automatically seek player when selecting a subtitle card">
+              <input
+                type="checkbox"
+                checked={autoSeek}
+                onChange={(e) => setAutoSeek(e.target.checked)}
+              />
+              Auto-seek on Select
+            </label>
+            <label className="checkbox-label" title="Start playback 2 seconds before the subtitle start time for context" style={{ opacity: autoSeek ? 1 : 0.5 }}>
+              <input
+                type="checkbox"
+                checked={leadIn}
+                onChange={(e) => setLeadIn(e.target.checked)}
+                disabled={!autoSeek}
+              />
+              2s Lead-in Context
+            </label>
+          </div>
+        </div>
+      )}
 
       {showShiftControls && (
         <div className="shift-helper-panel animate-slide-down">
@@ -541,11 +579,29 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
                 key={cue.id}
                 id={`cue-card-${cue.id}`}
                 className={`cue-card ${isActive ? 'active-playing' : ''} ${isSelected ? 'selected' : ''} ${isManualAnchor ? 'manual-anchor' : ''} ${isAutoAdjusted ? 'auto-adjusted' : ''}`}
-                onClick={() => onSelectCue(cue.id)}
+                onClick={() => {
+                  onSelectCue(cue.id);
+                  if (autoSeek) {
+                    const targetTime = leadIn ? Math.max(0, cue.startTime - 2.0) : cue.startTime;
+                    onSeek(targetTime);
+                  }
+                }}
               >
                 <div className="cue-header">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div className="cue-index-badge">#{cue.index}</div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const targetTime = leadIn ? Math.max(0, cue.startTime - 2.0) : cue.startTime;
+                        onSeek(targetTime);
+                      }}
+                      className="btn-card-play-seek"
+                      title={`Seek player to ${leadIn ? '2s before ' : ''}start time (${cue.startTime.toFixed(2)}s)`}
+                      type="button"
+                    >
+                      <Play size={10} fill="currentColor" />
+                    </button>
                     {scalingModeEnabled && (
                       <button
                         onClick={(e) => {
