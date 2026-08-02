@@ -8,6 +8,15 @@ This document tracks issues, bug reports, and potential root causes reported dur
 
 ## Resolved Issues
 
+- [x] **Multi-Second Lag on "Ready to Go" Workspace Transition**
+  - **Description**: Clicking the "Ready to Go" button caused a multi-second main-thread lag without visual feedback before the workspace editor rendered.
+  - **Root Cause**: Unmounting `FileDropZone` and mounting `<MediaPanel>` and `<SubtitleEditor>` (which renders all cue card components, calculates offsets, and initializes browser media element audio nodes) occurs synchronously on the main thread. Without a visual loading state or frame deferral, the button appeared frozen.
+  - **Resolution**: Added `isStartingWorkspace` state to `FileDropZone.tsx`, immediately displaying a spinning `<Loader2>` icon ("Starting Workspace...") and disabling the button on click. Used `setTimeout(..., 50)` frame deferral so the DOM repaints the loading indicator before mounting the editor components.
+
+
+
+## Resolved Issues
+
 - [x] **Premature UI Transition on Media File Upload**
   - **Description**: Uploading a media file first immediately transitions the screen away from the upload dropzone, preventing the user from uploading or managing subtitle files afterwards.
   - **Root Cause**: In `src/App.tsx`, the workspace view selection was strictly conditioned on `!mediaFile`. When `mediaFile` was set, `FileDropZone` unmounted immediately.

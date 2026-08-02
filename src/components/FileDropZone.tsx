@@ -31,6 +31,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
 }) => {
   const [isDragActive, setIsDragActive] = useState(false);
   const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const [isStartingWorkspace, setIsStartingWorkspace] = useState(false);
   const [unrecognizedFileError, setUnrecognizedFileError] = useState<string | null>(null);
   const mediaInputRef = useRef<HTMLInputElement>(null);
   const srtInputRef = useRef<HTMLInputElement>(null);
@@ -219,17 +220,30 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
           </div>
           <button
             onClick={() => {
-              if (subtitleTracks.length === 0) {
-                onCreateNewSubtitles();
-              }
-              onStartWorkspace?.();
+              if (isStartingWorkspace) return;
+              setIsStartingWorkspace(true);
+              setTimeout(() => {
+                if (subtitleTracks.length === 0) {
+                  onCreateNewSubtitles();
+                }
+                onStartWorkspace?.();
+              }, 50);
             }}
             className="btn btn-primary btn-lg ready-btn"
             type="button"
-            disabled={isProcessingFile || isLoadingRemoteSubtitles}
+            disabled={isProcessingFile || isLoadingRemoteSubtitles || isStartingWorkspace}
           >
-            <span>{__('Ready to Go')}</span>
-            <ArrowRight size={20} />
+            {isStartingWorkspace ? (
+              <>
+                <Loader2 className="spinner-icon" size={20} />
+                <span>{__('Starting Workspace...')}</span>
+              </>
+            ) : (
+              <>
+                <span>{__('Ready to Go')}</span>
+                <ArrowRight size={20} />
+              </>
+            )}
           </button>
         </div>
       )}
