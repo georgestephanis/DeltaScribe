@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Upload, FileVideo, FileAudio, FileText, CheckCircle2, Loader2, ArrowRight } from 'lucide-react';
+import { Upload, FileVideo, FileAudio, FileText, CheckCircle2, Loader2, ArrowRight, AlertCircle } from 'lucide-react';
 import { __, sprintf } from '../utils/i18n';
 
 interface FileDropZoneProps {
@@ -14,6 +14,13 @@ interface FileDropZoneProps {
   onStartWorkspace?: () => void;
   isLoadingRemoteSubtitles?: boolean;
   remoteLoadError?: string | null;
+  savedSession?: {
+    mediaFile: { name: string; type: string; url: string; isRemote?: boolean } | null;
+    subtitleTracks: { id: string; name: string; cues: any[] }[];
+    timestamp: number;
+  } | null;
+  onRestoreSession?: () => void;
+  onDiscardSession?: () => void;
 }
 
 export const FileDropZone: React.FC<FileDropZoneProps> = ({
@@ -28,6 +35,9 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
   onStartWorkspace,
   isLoadingRemoteSubtitles = false,
   remoteLoadError,
+  savedSession = null,
+  onRestoreSession,
+  onDiscardSession,
 }) => {
   const [isDragActive, setIsDragActive] = useState(false);
   const [isProcessingFile, setIsProcessingFile] = useState(false);
@@ -129,6 +139,46 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
           <span>{unrecognizedFileError}</span>
         </div>
       )}
+
+      {savedSession && (
+        <div className="saved-session-banner-card">
+          <div className="saved-session-content">
+            <div className="saved-session-header">
+              <span className="saved-session-badge">🎒 {__('Saved Draft')}</span>
+              <h4>{__('Resume Your Previous Work')}</h4>
+            </div>
+            <p>
+              {sprintf(
+                __('DeltaScribe found an autosaved session from %s. You can pick up right where you left off editing details for:'),
+                new Date(savedSession.timestamp).toLocaleString()
+              )}
+            </p>
+            <div className="saved-session-details">
+              <div className="detail-item">
+                <strong>{__('Media:')}</strong>{' '}
+                <span>{savedSession.mediaFile ? savedSession.mediaFile.name : __('None')}</span>
+              </div>
+              <div className="detail-item">
+                <strong>{__('Subtitles:')}</strong>{' '}
+                <span>
+                  {savedSession.subtitleTracks.length > 0
+                    ? `${savedSession.subtitleTracks[0].name} (${savedSession.subtitleTracks[0].cues.length} cues)`
+                    : __('Empty Track')}
+                </span>
+              </div>
+            </div>
+            <div className="saved-session-actions">
+              <button onClick={onRestoreSession} className="btn btn-primary btn-sm" type="button">
+                {__('Restore Session')}
+              </button>
+              <button onClick={onDiscardSession} className="btn btn-secondary btn-sm" type="button">
+                {__('Discard Draft')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div
         className={`dropzone ${isDragActive ? 'drag-active' : ''}`}
         onDragEnter={handleDrag}
@@ -206,45 +256,63 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
       </div>
 
       {mediaFile && (
-        <div className="ready-to-go-banner">
+        <div className={`ready-to-go-banner ${!mediaFile.url ? 'pending-media-banner' : ''}`}>
           <div className="banner-info">
-            <CheckCircle2 className="ready-icon" size={28} />
+            {!mediaFile.url ? (
+              <AlertCircle className="ready-icon text-warning" size={28} />
+            ) : (
+              <CheckCircle2 className="ready-icon" size={28} />
+            )}
             <div>
-              <h4>{__('Media Asset Ready')}</h4>
+              <h4>{!mediaFile.url ? __('Media Re-selection Required') : __('Media Asset Ready')}</h4>
               <p>
-                {subtitleTracks.length > 0
-                  ? sprintf(__('%d subtitle track(s) loaded. Click below to start editing!'), subtitleTracks.length)
-                  : __('No subtitle file added yet. You can add one now or proceed with an empty track.')}
+                {!mediaFile.url
+                  ? sprintf(__('To resume editing, select the media file: %s'), mediaFile.name)
+                  : subtitleTracks.length > 0
+                    ? sprintf(__('%d subtitle track(s) loaded. Click below to start editing!'), subtitleTracks.length)
+                    : __('No subtitle file added yet. You can add one now or proceed with an empty track.')}
               </p>
             </div>
           </div>
-          <button
-            onClick={() => {
-              if (isStartingWorkspace) return;
-              setIsStartingWorkspace(true);
-              setTimeout(() => {
-                if (subtitleTracks.length === 0) {
-                  onCreateNewSubtitles();
-                }
-                onStartWorkspace?.();
-              }, 50);
-            }}
-            className="btn btn-primary btn-lg ready-btn"
-            type="button"
-            disabled={isProcessingFile || isLoadingRemoteSubtitles || isStartingWorkspace}
-          >
-            {isStartingWorkspace ? (
-              <>
-                <Loader2 className="spinner-icon" size={20} />
-                <span>{__('Starting Workspace...')}</span>
-              </>
-            ) : (
-              <>
-                <span>{__('Ready to Go')}</span>
-                <ArrowRight size={20} />
-              </>
-            )}
-          </button>
+          {!mediaFile.url ? (
+            <button
+              onClick={() => mediaInputRef.current?.click()}
+              className="btn btn-warning btn-lg ready-btn"
+              type="button"
+              disabled={isProcessingFile}
+            >
+              <Upload size={20} />
+              <span>{__('Select Media')}</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                if (isStartingWorkspace) return;
+                setIsStartingWorkspace(true);
+                setTimeout(() => {
+                  if (subtitleTracks.length === 0) {
+                    onCreateNewSubtitles();
+                  }
+                  onStartWorkspace?.();
+                }, 50);
+              }}
+              className="btn btn-primary btn-lg ready-btn"
+              type="button"
+              disabled={isProcessingFile || isLoadingRemoteSubtitles || isStartingWorkspace}
+            >
+              {isStartingWorkspace ? (
+                <>
+                  <Loader2 className="spinner-icon" size={20} />
+                  <span>{__('Starting Workspace...')}</span>
+                </>
+              ) : (
+                <>
+                  <span>{__('Ready to Go')}</span>
+                  <ArrowRight size={20} />
+                </>
+              )}
+            </button>
+          )}
         </div>
       )}
 
@@ -254,7 +322,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
             {isProcessingFile ? (
               <Loader2 className="icon spinner-icon text-primary" />
             ) : mediaFile ? (
-              isAudio ? <FileAudio className="icon text-audio" /> : <FileVideo className="icon text-video" />
+              !mediaFile.url ? <AlertCircle className="icon text-warning" /> : (isAudio ? <FileAudio className="icon text-audio" /> : <FileVideo className="icon text-video" />)
             ) : (
               <FileVideo className="icon text-muted" />
             )}
@@ -263,8 +331,17 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
           <div className="card-body">
             {mediaFile ? (
               <div className="loaded-details">
-                <CheckCircle2 className="success-icon" size={16} />
-                <span className="file-name" title={mediaFile.name}>{mediaFile.name}</span>
+                {!mediaFile.url ? (
+                  <>
+                    <AlertCircle className="warning-icon text-warning" size={16} />
+                    <span className="file-name text-warning" title={mediaFile.name}>{sprintf(__('%s (re-select)'), mediaFile.name)}</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="success-icon" size={16} />
+                    <span className="file-name" title={mediaFile.name}>{mediaFile.name}</span>
+                  </>
+                )}
               </div>
             ) : (
               <span className="placeholder">{__('No media file loaded')}</span>
@@ -330,11 +407,13 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
         <h4>🔗 Link Prepopulation Guide</h4>
         <p>Pre-configure workspaces by passing source URLs as parameter coordinates in the address bar:</p>
         <div className="url-example">
-          <code>{`${window.location.origin}/?media=https://example.com/video.mp4&subtitles=https://example.com/subs.vtt&submit=https://example.com/api/save`}</code>
+          <code>{`${window.location.origin}/?media=https://example.com/video.mp4&subtitles=https://example.com/subs.vtt&format=vtt&lang=en-US&submit=https://example.com/api/save`}</code>
         </div>
         <div className="parameter-descriptions">
           <p>• <strong>media</strong>: URL path to an audio or video streaming source.</p>
           <p>• <strong>subtitles</strong>: URL path to parsed SRT, WebVTT, or TTML captions.</p>
+          <p>• <strong>format</strong>: Lock choice of export format (<code>srt</code>, <code>vtt</code>, or <code>ttml</code>).</p>
+          <p>• <strong>lang</strong>: Define target language code (e.g., <code>en</code>, <code>es-ES</code>), applied to TTML's document metadata.</p>
           <p>• <strong>submit</strong>: Optional webhook URL. Adds a <em>Submit</em> button in the header actions tray.</p>
         </div>
         <p className="cors-note">* Note: Hosting endpoints must serve files with permissive CORS headers to allow browser fetching and canvas wave visualizers.</p>

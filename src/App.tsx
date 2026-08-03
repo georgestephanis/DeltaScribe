@@ -7,7 +7,7 @@ import { AuditLogDrawer, type AuditLogEntry } from './components/AuditLogDrawer'
 import { parseSRT, formatSRT, formatVTT, formatTTML, type SubtitleCue, interpolateTime } from './utils/subtitles';
 import { Download, RefreshCw, AlertCircle, History } from 'lucide-react';
 import { AiAligner } from './components/AiAligner';
-import { __ } from './utils/i18n';
+import { __, sprintf } from './utils/i18n';
 import logoIcon from './assets/delta-scribe-icon.svg';
 import { generateId } from './utils/id';
 
@@ -32,6 +32,11 @@ function App() {
   const [enableAlignment, setEnableAlignment] = useState(false);
   const [enableFormatting, setEnableFormatting] = useState(false);
 
+  // Audit Log & Undo / Redo History Stack
+  const [historyStack, setHistoryStack] = useState<{ tracks: typeof subtitleTracks; description: string }[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
+
   // Derived state values computed on render
   const activeTrack = subtitleTracks.find(t => t.id === activeTrackId);
   const cues = activeTrack ? activeTrack.cues : [];
@@ -46,6 +51,148 @@ function App() {
     );
   }, [activeTrackId]);
 
+  // Saved Session state for draft recovery
+  const [savedSession, setSavedSession] = useState<{
+    mediaFile: { name: string; type: string; url: string; isRemote?: boolean } | null;
+    subtitleTracks: { id: string; name: string; cues: SubtitleCue[] }[];
+    activeTrackId: string | null;
+    exportFormat: 'srt' | 'vtt' | 'ttml';
+    enableAlignment: boolean;
+    enableFormatting: boolean;
+    historyStack: any[];
+    historyIndex: number;
+    auditLog: AuditLogEntry[];
+    scalingModeEnabled?: boolean;
+    scalingOptions?: { anchorStart: boolean; anchorEnd: boolean };
+    timestamp: number;
+  } | null>(null);
+
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
+
+  // Fetch saved session from LocalStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('deltascribe_saved_session');
+      if (saved) {
+        setSavedSession(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.error("Failed to parse saved session from LocalStorage", e);
+    }
+  }, []);
+
+  const handleRestoreSession = () => {
+    if (!savedSession) return;
+
+    setSubtitleTracks(savedSession.subtitleTracks);
+    setActiveTrackId(savedSession.activeTrackId);
+    setExportFormat(savedSession.exportFormat);
+    setEnableAlignment(savedSession.enableAlignment);
+    setEnableFormatting(savedSession.enableFormatting);
+    setHistoryStack(savedSession.historyStack);
+    setHistoryIndex(savedSession.historyIndex);
+    setAuditLog(savedSession.auditLog);
+    if (savedSession.scalingModeEnabled !== undefined) {
+      setScalingModeEnabled(savedSession.scalingModeEnabled);
+    }
+    if (savedSession.scalingOptions !== undefined) {
+      setScalingOptions(savedSession.scalingOptions);
+    }
+
+    if (savedSession.mediaFile) {
+      if (savedSession.mediaFile.isRemote && savedSession.mediaFile.url) {
+        setMediaFile(savedSession.mediaFile);
+        setIsWorkspaceReady(true);
+      } else {
+        setMediaFile({
+          name: savedSession.mediaFile.name,
+          type: savedSession.mediaFile.type,
+          url: '',
+          isRemote: false
+        });
+        setIsWorkspaceReady(false);
+      }
+    } else {
+      setIsWorkspaceReady(true);
+    }
+
+    const activeTrack = savedSession.subtitleTracks.find(t => t.id === savedSession.activeTrackId);
+    if (activeTrack && activeTrack.cues.length > 0) {
+      setSelectedCueId(activeTrack.cues[0].id);
+    }
+
+    setSavedSession(null);
+  };
+
+  const handleDiscardSession = () => {
+    try {
+      localStorage.removeItem('deltascribe_saved_session');
+    } catch (e) {
+      console.warn("Failed to discard session from LocalStorage", e);
+    }
+    setSavedSession(null);
+  };
+
+  // Effect to autosave state to LocalStorage
+  useEffect(() => {
+    if (subtitleTracks.length === 0 && !mediaFile) {
+      return;
+    }
+
+    const sessionData = {
+      mediaFile: mediaFile ? {
+        name: mediaFile.name,
+        type: mediaFile.type,
+        url: mediaFile.isRemote ? mediaFile.url : '',
+        isRemote: mediaFile.isRemote
+      } : null,
+      subtitleTracks,
+      activeTrackId,
+      exportFormat,
+      enableAlignment,
+      enableFormatting,
+      historyStack,
+      historyIndex,
+      auditLog,
+      scalingModeEnabled,
+      scalingOptions,
+      timestamp: Date.now()
+    };
+
+    try {
+      localStorage.setItem('deltascribe_saved_session', JSON.stringify(sessionData));
+      const now = new Date();
+      setLastSavedTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    } catch (e) {
+      console.warn("DeltaScribe: Failed to autosave session to LocalStorage (possibly full)", e);
+    }
+  }, [
+    subtitleTracks,
+    activeTrackId,
+    exportFormat,
+    enableAlignment,
+    enableFormatting,
+    mediaFile,
+    historyStack,
+    historyIndex,
+    auditLog,
+    scalingModeEnabled,
+    scalingOptions
+  ]);
+
+  // Prompt before window close/unload to prevent data loss
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (subtitleTracks.length > 0) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [subtitleTracks]);
+
   // Workspace state & remote loading tracking
   const [isWorkspaceReady, setIsWorkspaceReady] = useState(false);
   const [isLoadingRemoteSubtitles, setIsLoadingRemoteSubtitles] = useState(false);
@@ -56,10 +203,7 @@ function App() {
   // History Log drawer display toggle
   const [showAuditLog, setShowAuditLog] = useState(false);
 
-  // Audit Log & Undo / Redo History Stack
-  const [historyStack, setHistoryStack] = useState<{ tracks: typeof subtitleTracks; description: string }[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
-  const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
+
 
   const pushHistoryState = useCallback((newTracks: typeof subtitleTracks, description: string, actionType: AuditLogEntry['actionType']) => {
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -788,6 +932,12 @@ function App() {
       setCurrentTime(0);
       setDuration(0);
       setIsPlaying(false);
+      
+      try {
+        localStorage.removeItem('deltascribe_saved_session');
+      } catch (e) {
+        console.warn("Failed to clear session from LocalStorage", e);
+      }
     }
   };
 
@@ -946,6 +1096,12 @@ function App() {
           <h1>{__('DeltaScribe Studio')}</h1>
         </div>
         <div className="header-actions-group">
+          {lastSavedTime && (
+            <span className="autosave-status" title={__('Changes are automatically saved to your browser local storage')}>
+              <span className="autosave-dot"></span>
+              {sprintf(__('Autosaved %s'), lastSavedTime)}
+            </span>
+          )}
           {!mediaFile && <KeyboardShortcutsHelp />}
           {mediaFile && (
             <>
@@ -1036,6 +1192,9 @@ function App() {
               onStartWorkspace={() => setIsWorkspaceReady(true)}
               isLoadingRemoteSubtitles={isLoadingRemoteSubtitles}
               remoteLoadError={remoteLoadError}
+              savedSession={savedSession}
+              onRestoreSession={handleRestoreSession}
+              onDiscardSession={handleDiscardSession}
             />
           </div>
         ) : (
