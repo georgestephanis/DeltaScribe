@@ -1,10 +1,18 @@
 # DeltaScribe Studio
 
+**[Try it in your browser →](https://georgestephanis.github.io/DeltaScribe/)** Your media and subtitle files stay in your browser.
+
 ![DeltaScribe Studio Banner](src/assets/delta-scribe-banner.svg)
 
 DeltaScribe is a sleek, premium, client-side subtitle and lyric timing synchronization studio built with React, Vite, and TypeScript. 
 
-It is designed to align subtitles and audio/video files completely in the browser—meaning **no media files or subtitles are ever uploaded to a server**, keeping your workflows private, secure, and fast.
+It is designed to align subtitles and audio/video files completely in the browser: **your media and subtitle files are not uploaded anywhere** unless you choose a feature that sends data out:
+
+- **Voice transcription** uses the browser's speech recognition, which in Chrome sends microphone audio to Google.
+- **OpenAI-compatible AI** sends subtitle text to the endpoint you configure, which may be a cloud API.
+- **Submit URLs** (`?submit=`) POST the finished subtitles to that URL when you click Submit.
+
+The page also loads its fonts from Google Fonts.
 
 ---
 
@@ -21,7 +29,7 @@ It is designed to align subtitles and audio/video files completely in the browse
 6. **Self-Healing Remote CORS Streaming**: If remote media files lack CORS headers, DeltaScribe automatically falls back to stream them directly through standard browser decoding (so the player remains playable), only disabling the visualizer and warning the user.
 7. **Submit Webhooks Callback**: If a `submit` URL is provided in the query string, a "Submit" button renders next to the export selector, allowing users to POST the final formatted subtitle payload back to their database/server.
 8. **Speech-to-Text Sync Assistant**: Speak or play media out loud to capture real-time voice timestamps using the browser's native `SpeechRecognition` API.
-9. **Chrome Gemini Nano & OpenAI AI Integrations**: Align subtitles automatically or translate text in-place using Chrome's local built-in AI (`window.ai.languageModel`) or any OpenAI-compatible API endpoint (such as Ollama, llama.cpp, or vLLM). Falls back to an offline sequential algorithmic mapping if AI models are disabled.
+9. **Chrome Gemini Nano & OpenAI AI Integrations**: Align subtitles automatically or translate text in-place using Chrome's local built-in AI (`window.ai.languageModel`) or any OpenAI-compatible API endpoint (such as Ollama, llama.cpp, or vLLM). Falls back to an offline sequential algorithmic mapping if AI models are disabled. To use a local server such as Ollama from the hosted demo, allow the demo's origin (for Ollama: `OLLAMA_ORIGINS=https://georgestephanis.github.io`). Your browser may also ask permission to reach local network devices. The API key is kept only for the current browser session.
 10. **Stable Timeline Indexing**: Caption cards remain anchored in their visual list positions while editing timings to prevent visual disorientation. Re-sorting and re-indexing occur only on exports, or after AI bulk actions.
 11. **Dynamic Textareas**: Text boxes auto-resize based on input lines to keep all subtitle text fully visible.
 12. **Read-Only / Text Safety Lock**: Toggle lock settings to prevent accidental edits to subtitle text lines while adjusting timings.
@@ -124,10 +132,15 @@ Our third-party dependencies are clustered below by license type:
 #### MIT License
 *   `react` (Core frontend framework library)
 *   `react-dom` (React document interface renderer)
-*   `lucide-react` (SVG icons package)
 *   `vite` & `@vitejs/plugin-react` (Application builder and bundler plugins)
 *   `oxlint` (Static analysis and code quality linter)
 *   `@types/react`, `@types/react-dom`, `@types/node` (TypeScript type declarations)
+
+#### ISC License
+*   `lucide-react` (SVG icons package)
+
+#### GPL-2.0-or-later
+*   `@wordpress/i18n` (Translation functions)
 
 #### Apache License 2.0
 *   `typescript` (Typed scripting language compiler engine)
