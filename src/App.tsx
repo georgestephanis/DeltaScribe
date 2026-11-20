@@ -375,23 +375,33 @@ function App() {
     apiKey: string;
     model: string;
   }>(() => {
+    // The API key lives only in sessionStorage: the hosted demo shares an
+    // origin with other apps, so it shouldn't persist in localStorage.
+    const apiKey = sessionStorage.getItem('deltascribe_ai_api_key') ?? '';
     const saved = localStorage.getItem('deltascribe_ai_settings');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (parsed.apiKey) {
+          // Migrate a key saved by older versions out of localStorage.
+          if (!apiKey) sessionStorage.setItem('deltascribe_ai_api_key', parsed.apiKey);
+          localStorage.setItem('deltascribe_ai_settings', JSON.stringify({ ...parsed, apiKey: '' }));
+        }
+        return { ...parsed, apiKey: apiKey || parsed.apiKey || '' };
       } catch {}
     }
     return {
       provider: 'chrome',
       endpoint: 'http://localhost:11434/v1',
-      apiKey: '',
+      apiKey,
       model: 'llama3'
     };
   });
 
   const handleUpdateAiSettings = (newSettings: typeof aiSettings) => {
     setAiSettings(newSettings);
-    localStorage.setItem('deltascribe_ai_settings', JSON.stringify(newSettings));
+    localStorage.setItem('deltascribe_ai_settings', JSON.stringify({ ...newSettings, apiKey: '' }));
+    sessionStorage.setItem('deltascribe_ai_api_key', newSettings.apiKey);
   };
 
   const playerRef = useRef<HTMLMediaElement | null>(null);
