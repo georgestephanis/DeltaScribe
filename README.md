@@ -1,5 +1,7 @@
 # DeltaScribe Studio
 
+**[Try it in your browser →](https://georgestephanis.github.io/DeltaScribe/)** Nothing is uploaded; it all runs locally in the page.
+
 ![DeltaScribe Studio Banner](src/assets/delta-scribe-banner.svg)
 
 DeltaScribe is a sleek, premium, client-side subtitle and lyric timing synchronization studio built with React, Vite, and TypeScript. 
