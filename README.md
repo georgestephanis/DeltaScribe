@@ -1,8 +1,14 @@
 # DeltaScribe Studio
 
 > [!TIP]
-> **Look before you build.** [wvw.dev](https://wvw.dev) is a catalog of open-source apps, many of them built with AI.
-> Similar projects there: [Subtitle Shifter](https://wvw.dev/#/discover/findutils-subtitle-shifter) (moves every cue by one offset), [Subtitle Overlap Fixer](https://wvw.dev/#/discover/findutils-subtitle-overlap-fixer) (fixes overlapping cues), [Subtitle FPS Converter](https://wvw.dev/#/discover/findutils-subtitle-fps-converter) (rescales timings between frame rates), [SRT to VTT](https://wvw.dev/#/discover/findutils-srt-to-vtt) (converts caption formats), [Captioneer](https://wvw.dev/#/discover/radioheavy-captioneer) (live transcription and captions). Before spending tokens on a new app, search wvw.dev for something you can fork, this repo included.
+> **Look before you build.** Similar open-source projects:
+>
+> - [Subtitle Edit](https://github.com/SubtitleEdit/subtitleedit): desktop subtitle editor with waveform timing, MIT
+> - [Aegisub](https://github.com/TypesettingTools/Aegisub): desktop subtitle timing and typesetting, BSD
+> - [Gaupol](https://github.com/otsaloma/gaupol): subtitle editor for Linux, GPL-3.0
+> - [Subtitle Shifter](https://wvw.dev/#/discover/findutils-subtitle-shifter): in-browser offset shifting, on wvw.dev
+>
+> Before building your own tool, search [AlternativeTo](https://alternativeto.net) (filter to open source), [GitHub](https://github.com/search?type=repositories) and [wvw.dev](https://wvw.dev) for something to fork, this repo included.
 
 **[Try it in your browser →](https://georgestephanis.github.io/DeltaScribe/)** Your media and subtitle files stay in your browser.
 
